@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Daikin Dashboard
 
-## Getting Started
+Next.js dashboard for controlling multiple Daikin Comfora units via the Onecta cloud API.
 
-First, run the development server:
+## Features
+
+- Live status for all AC units in a household/site
+- Per-unit controls (power, mode, temperature, fan)
+- Master panel with checkboxes to batch-apply settings
+- Site selector (or hardcode via `DAIKIN_SITE_ID`)
+- Demo mode with 5 sample units when credentials are missing
+
+## Setup
+
+1. Register an app at [Daikin Developer Portal](https://developer.cloud.daikineurope.com/)
+2. Set redirect URI to **`localhost:3000/api/auth/callback`** (Daikin portal usually does not allow `http://`)
+3. Copy credentials:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env
+# fill DAIKIN_CLIENT_ID and DAIKIN_CLIENT_SECRET
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Optional room labels:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+DAIKIN_ROOM_LABELS={"your-device-uuid":"Obývák","another-uuid":"Ložnice"}
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+5. Run:
 
-## Learn More
+```bash
+pnpm install
+pnpm dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+Open http://localhost:3000 and complete OAuth via the connect panel.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### OAuth stuck after consent?
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Daikin Developer Portal often only accepts redirect URIs **without** `http://`, e.g. `localhost:3000/api/auth/callback`. After consent the browser cannot open that URL automatically (console error: `Failed to launch 'localhost:3000/...'`).
 
-## Deploy on Vercel
+**Workaround (built into the dashboard):**
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Click **Přihlásit u Daikin**
+2. Approve scopes in Daikin
+3. Open browser DevTools → Console
+4. Copy the full `localhost:3000/api/auth/callback?code=...&state=...` line from the error
+5. Paste it into the dashboard and click **Dokončit přihlášení**
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Set the same redirect URI in `.env`:
+
+```env
+DAIKIN_REDIRECT_URI=localhost:3000/api/auth/callback
+```
+
+## API rate limits
+
+Daikin limits cloud API to ~200 requests/day and 20/minute. Batch controls include a short delay between units.
+
+## Tech stack
+
+- Next.js 16 (App Router)
+- React 19 + TypeScript
+- Tailwind CSS 4

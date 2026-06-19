@@ -1,26 +1,91 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0f1419;
+  --foreground: #e8edf2;
+  --card: #1a222c;
+  --accent: #2dd4bf;
+  --accent-soft: #14b8a6;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-outfit);
+  --font-mono: var(--font-jetbrains);
+  --shadow-glow-teal: 0 0 24px rgb(45 212 191 / 0.25);
+  --shadow-glow-teal-soft: 0 0 40px rgb(45 212 191 / 0.12);
+  --shadow-card: 0 8px 32px rgb(0 0 0 / 0.35);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+.bg-app-gradient {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgb(45 212 191 / 0.12), transparent),
+    linear-gradient(180deg, #0f1419 0%, #121820 50%, #0d1117 100%);
+}
+
+.bg-card-gradient {
+  background: linear-gradient(145deg, rgb(26 34 44 / 0.95) 0%, rgb(20 27 35 / 0.98) 100%);
+}
+
+.bg-card-on-gradient {
+  background: linear-gradient(
+    145deg,
+    rgb(22 48 52 / 0.95) 0%,
+    rgb(18 32 38 / 0.98) 100%
+  );
+}
+
+
+.bg-master-gradient {
+  background: linear-gradient(135deg, rgb(20 35 40 / 0.9) 0%, rgb(15 25 30 / 0.95) 100%);
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgb(45 212 191 / 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(45 212 191 / 0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.shadow-glow-teal {
+  box-shadow: var(--shadow-glow-teal);
+}
+
+.shadow-glow-teal-soft {
+  box-shadow: var(--shadow-glow-teal-soft);
+}
+
+.shadow-card {
+  box-shadow: var(--shadow-card);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #2dd4bf, #06b6d4);
+  box-shadow: 0 0 12px rgb(45 212 191 / 0.5);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  border: none;
+  background: linear-gradient(135deg, #2dd4bf, #06b6d4);
+  box-shadow: 0 0 12px rgb(45 212 191 / 0.5);
+  cursor: pointer;
+}
+
+code {
+  font-family: var(--font-jetbrains), monospace;
+  font-size: 0.85em;
 }
