@@ -159,6 +159,8 @@ fi
 ensure_project
 ensure_billing
 
+ACTIVE_ACCOUNT="$(gcloud config get-value account 2>/dev/null || echo unknown)"
+echo "==> gcloud account: ${ACTIVE_ACCOUNT}"
 echo "==> Active project: ${GCP_PROJECT_ID} (${REGION})"
 gcloud config set project "${GCP_PROJECT_ID}" >/dev/null
 
@@ -302,7 +304,7 @@ if [[ "${SKIP_DEPLOY:-}" != "1" ]]; then
   gcloud run services update "${SERVICE_NAME}" \
     --project="${GCP_PROJECT_ID}" \
     --region="${REGION}" \
-    --update-env-vars "DAIKIN_REDIRECT_URI=${PRODUCTION_REDIRECT}" \
+    --update-env-vars "DAIKIN_REDIRECT_URI=${PRODUCTION_REDIRECT},DAIKIN_PUBLIC_URL=${SERVICE_URL}" \
     --quiet
 fi
 

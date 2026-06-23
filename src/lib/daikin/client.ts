@@ -153,6 +153,7 @@ export async function getAuthStatus(): Promise<{
   expiresAt: number | null;
   redirectUri: string;
   manualOAuth: boolean;
+  usesOAuthProxy: boolean;
 }> {
   const config = loadDaikinConfig();
 
@@ -163,6 +164,7 @@ export async function getAuthStatus(): Promise<{
       expiresAt: null,
       redirectUri: config.redirectUri,
       manualOAuth: config.manualOAuth,
+      usesOAuthProxy: config.usesOAuthProxy,
     };
   }
 
@@ -173,6 +175,7 @@ export async function getAuthStatus(): Promise<{
     expiresAt: token?.expires_at ?? null,
     redirectUri: config.redirectUri,
     manualOAuth: config.manualOAuth,
+    usesOAuthProxy: config.usesOAuthProxy,
   };
 }
 

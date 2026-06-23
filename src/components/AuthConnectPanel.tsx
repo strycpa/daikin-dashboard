@@ -7,6 +7,7 @@ interface AuthConnectPanelProps {
   demoMode: boolean;
   redirectUri: string;
   manualOAuth: boolean;
+  usesOAuthProxy: boolean;
   onConnected: () => void;
   onError: (message: string) => void;
 }
@@ -15,12 +16,15 @@ export function AuthConnectPanel({
   demoMode,
   redirectUri,
   manualOAuth,
+  usesOAuthProxy,
   onConnected,
   onError,
 }: AuthConnectPanelProps) {
   const [codeInput, setCodeInput] = useState("");
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const showManualFallback = manualOAuth && !usesOAuthProxy;
 
   const startOAuth = async () => {
     onError("");
@@ -39,7 +43,7 @@ export function AuthConnectPanel({
       }
 
       setAuthUrl(data.url);
-      window.open(data.url, "_blank", "noopener,noreferrer");
+      window.location.assign(data.url);
     } catch {
       onError("Nepodařilo se vytvořit přihlašovací URL.");
     } finally {
@@ -95,7 +99,16 @@ export function AuthConnectPanel({
         <code className="text-teal-300">{redirectUri}</code>
       </p>
 
-      {manualOAuth && (
+      {usesOAuthProxy && (
+        <div className="mt-4 rounded-xl border border-teal-500/25 bg-teal-500/10 px-4 py-3 text-sm text-teal-100/90">
+          Daikin přesměruje na produkční callback{" "}
+          <code className="text-teal-50">{redirectUri}</code>, který podle{" "}
+          <code className="text-teal-50">state</code> přepošle kód zpět sem (localhost
+          nebo produkce). Ruční kopírování URL z konzole není potřeba.
+        </div>
+      )}
+
+      {showManualFallback && (
         <div className="mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100/90">
           Daikin portál neukládá <code className="text-amber-50">http://</code> — po
           souhlasu se stránka „zasekne“ a v konzoli prohlížeče uvidíš řádek{" "}
@@ -118,8 +131,6 @@ export function AuthConnectPanel({
             {authUrl && (
               <a
                 href={authUrl}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="text-xs text-teal-400 underline"
               >
                 odkaz znovu
@@ -128,7 +139,7 @@ export function AuthConnectPanel({
           </div>
         </li>
 
-        {manualOAuth && (
+        {showManualFallback && (
           <li className="flex gap-3">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-xs font-semibold text-teal-300">
               2
@@ -140,35 +151,41 @@ export function AuthConnectPanel({
           </li>
         )}
 
-        <li className="flex gap-3">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-xs font-semibold text-teal-300">
-            {manualOAuth ? "3" : "2"}
-          </span>
-          <div className="flex w-full flex-col gap-3">
-            <span>
-              {manualOAuth
-                ? "Vlož callback URL nebo samotný authorization code"
-                : "Po přesměrování by mělo přihlášení proběhnout automaticky"}
+        {!showManualFallback && (
+          <li className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-xs font-semibold text-teal-300">
+              2
             </span>
-            {manualOAuth && (
-              <>
-                <textarea
-                  value={codeInput}
-                  onChange={(event) => setCodeInput(event.target.value)}
-                  placeholder="localhost:3000/api/auth/callback?code=st2.s....&state=..."
-                  rows={4}
-                  className="w-full rounded-xl border border-slate-600 bg-slate-950/80 px-3 py-2 font-mono text-xs text-slate-100 outline-none focus:border-teal-400/50"
-                />
-                <Button
-                  disabled={busy || !codeInput.trim()}
-                  onClick={() => void submitCode()}
-                >
-                  Dokončit přihlášení
-                </Button>
-              </>
-            )}
-          </div>
-        </li>
+            <span>
+              Po souhlasu tě Daikin vrátí přes proxy callback — přihlášení by mělo
+              proběhnout automaticky.
+            </span>
+          </li>
+        )}
+
+        {showManualFallback && (
+          <li className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-teal-500/20 text-xs font-semibold text-teal-300">
+              3
+            </span>
+            <div className="flex w-full flex-col gap-3">
+              <span>Vlož callback URL nebo samotný authorization code</span>
+              <textarea
+                value={codeInput}
+                onChange={(event) => setCodeInput(event.target.value)}
+                placeholder="localhost:3000/api/auth/callback?code=st2.s....&state=..."
+                rows={4}
+                className="w-full rounded-xl border border-slate-600 bg-slate-950/80 px-3 py-2 font-mono text-xs text-slate-100 outline-none focus:border-teal-400/50"
+              />
+              <Button
+                disabled={busy || !codeInput.trim()}
+                onClick={() => void submitCode()}
+              >
+                Dokončit přihlášení
+              </Button>
+            </div>
+          </li>
+        )}
       </ol>
     </section>
   );

@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeAuthorizationCode } from "@/lib/daikin/client";
 import { parseOAuthInput } from "@/lib/daikin/oauth";
+import { resolveOAuthNonce } from "@/lib/daikin/oauth-state";
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,11 +23,12 @@ export async function POST(request: NextRequest) {
     }
 
     const { code, state } = parseOAuthInput(rawInput);
+    const { nonce } = state ? resolveOAuthNonce(state) : { nonce: null };
     const cookieStore = await cookies();
     const savedState = cookieStore.get("daikin_oauth_state")?.value;
 
     if (savedState) {
-      if (!state) {
+      if (!nonce) {
         return NextResponse.json(
           {
             error:
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         );
       }
-      if (savedState !== state) {
+      if (savedState !== nonce) {
         return NextResponse.json(
           { error: "State nesedí — spusť přihlášení znovu od začátku." },
           { status: 400 },

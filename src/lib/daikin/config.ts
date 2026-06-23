@@ -1,5 +1,6 @@
 import path from "node:path";
 import { usesManualOAuthRedirect } from "./oauth";
+import { buildAllowedOAuthReturnUris } from "./oauth-state";
 
 export const AUTHORIZE_URL =
   "https://idp.onecta.daikineurope.com/v1/oidc/authorize";
@@ -14,8 +15,12 @@ export const DEFAULT_REDIRECT_URI = "localhost:3000/api/auth/callback";
 export interface DaikinConfig {
   clientId: string;
   clientSecret: string;
+  /** Redirect URI registered in Daikin Developer Portal (often without scheme). */
   redirectUri: string;
   manualOAuth: boolean;
+  /** Whether OAuth completes via the shared prod callback proxy. */
+  usesOAuthProxy: boolean;
+  oauthAllowedReturnUris: string[];
   tokenFile: string;
   siteId: string | null;
   roomLabels: Record<string, string>;
@@ -54,12 +59,15 @@ export function loadDaikinConfig(): DaikinConfig {
 
   const redirectUri =
     process.env.DAIKIN_REDIRECT_URI?.trim() || DEFAULT_REDIRECT_URI;
+  const manualOAuth = usesManualOAuthRedirect(redirectUri);
 
   return {
     clientId,
     clientSecret,
     redirectUri,
-    manualOAuth: usesManualOAuthRedirect(redirectUri),
+    manualOAuth,
+    usesOAuthProxy: manualOAuth,
+    oauthAllowedReturnUris: buildAllowedOAuthReturnUris(),
     tokenFile:
       process.env.DAIKIN_TOKEN_FILE?.trim() ??
       path.join(process.cwd(), ".data", "tokens.json"),

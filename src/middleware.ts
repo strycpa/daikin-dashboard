@@ -29,7 +29,7 @@ export function middleware(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl;
-  if (pathname === "/api/health") {
+  if (pathname === "/api/health" || pathname === "/api/auth/callback") {
     return NextResponse.next();
   }
 

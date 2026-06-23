@@ -18,6 +18,7 @@ interface AuthStatus {
   expiresAt: number | null;
   redirectUri?: string;
   manualOAuth?: boolean;
+  usesOAuthProxy?: boolean;
 }
 
 export function Dashboard() {
@@ -284,6 +285,7 @@ export function Dashboard() {
           demoMode={auth.demoMode}
           redirectUri={auth.redirectUri ?? "localhost:3000/api/auth/callback"}
           manualOAuth={auth.manualOAuth ?? true}
+          usesOAuthProxy={auth.usesOAuthProxy ?? false}
           onConnected={() => void handleAuthConnected()}
           onError={(message) => setError(message || null)}
         />

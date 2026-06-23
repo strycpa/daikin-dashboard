@@ -13,7 +13,8 @@ Next.js dashboard for controlling multiple Daikin Comfora units via the Onecta c
 ## Setup
 
 1. Register an app at [Daikin Developer Portal](https://developer.cloud.daikineurope.com/)
-2. Set redirect URI to **`localhost:3000/api/auth/callback`** (Daikin portal usually does not allow `http://`)
+2. Set redirect URI to your **production** Cloud Run host (Daikin allows only one app / one URI):
+   `your-service.europe-west1.run.app/api/auth/callback` (no `http://`)
 3. Copy credentials:
 
 ```bash
@@ -36,23 +37,35 @@ pnpm dev
 
 Open http://localhost:3000 and complete OAuth via the connect panel.
 
-### OAuth stuck after consent?
+### Local dev with a single Daikin redirect URI
 
-Daikin Developer Portal often only accepts redirect URIs **without** `http://`, e.g. `localhost:3000/api/auth/callback`. After consent the browser cannot open that URL automatically (console error: `Failed to launch 'localhost:3000/...'`).
+Daikin Developer Portal allows **one redirect URI** per app. Point it at production:
 
-**Workaround (built into the dashboard):**
+```text
+daikin-dashboard-XXXX.europe-west1.run.app/api/auth/callback
+```
 
-1. Click **Přihlásit u Daikin**
-2. Approve scopes in Daikin
-3. Open browser DevTools → Console
-4. Copy the full `localhost:3000/api/auth/callback?code=...&state=...` line from the error
-5. Paste it into the dashboard and click **Dokončit přihlášení**
-
-Set the same redirect URI in `.env`:
+In local `.env` set the same value:
 
 ```env
-DAIKIN_REDIRECT_URI=localhost:3000/api/auth/callback
+DAIKIN_REDIRECT_URI=daikin-dashboard-XXXX.europe-west1.run.app/api/auth/callback
 ```
+
+After Daikin consent, the production `/api/auth/callback` reads `state` and redirects the
+authorization code back to `http://localhost:3000/api/auth/callback` (or to production when
+you log in there). Token exchange still uses the registered redirect URI above.
+
+Optional overrides:
+
+```env
+DAIKIN_OAUTH_RETURN_URI=http://localhost:3000/api/auth/callback
+DAIKIN_PUBLIC_URL=https://daikin-dashboard-XXXX.europe-west1.run.app
+```
+
+### OAuth without proxy (legacy manual flow)
+
+If redirect URI is `localhost:3000/...` without `http://`, the browser cannot open it after consent.
+Use the manual paste flow in the connect panel, or switch to the shared production proxy above.
 
 ## API rate limits
 

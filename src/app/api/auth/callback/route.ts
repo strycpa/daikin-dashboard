@@ -1,6 +1,11 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { exchangeAuthorizationCode } from "@/lib/daikin/client";
+import { loadDaikinConfig } from "@/lib/daikin/config";
+import {
+  isAllowedOAuthReturnUri,
+  resolveOAuthNonce,
+} from "@/lib/daikin/oauth-state";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -19,10 +24,26 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const config = loadDaikinConfig();
+  const { nonce, proxyState } = resolveOAuthNonce(state);
+
+  if (proxyState) {
+    if (!isAllowedOAuthReturnUri(proxyState.returnTo, config.oauthAllowedReturnUris)) {
+      return NextResponse.redirect(
+        new URL("/?auth=error&message=invalid_return_uri", request.url),
+      );
+    }
+
+    const target = new URL(proxyState.returnTo);
+    target.searchParams.set("code", code);
+    target.searchParams.set("state", nonce);
+    return NextResponse.redirect(target);
+  }
+
   const cookieStore = await cookies();
   const savedState = cookieStore.get("daikin_oauth_state")?.value;
 
-  if (!savedState || savedState !== state) {
+  if (!savedState || savedState !== nonce) {
     return NextResponse.redirect(
       new URL("/?auth=error&message=invalid_state", request.url),
     );
