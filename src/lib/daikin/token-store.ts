@@ -2,16 +2,32 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { DaikinTokenSet } from "./types";
 
-export async function readTokenFile(
-  tokenFile: string,
-): Promise<DaikinTokenSet | null> {
+function parseTokenJson(raw: string): DaikinTokenSet | null {
   try {
-    const raw = await fs.readFile(tokenFile, "utf8");
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null) {
       return null;
     }
     return parsed as DaikinTokenSet;
+  } catch {
+    return null;
+  }
+}
+
+export async function readTokenFile(
+  tokenFile: string,
+): Promise<DaikinTokenSet | null> {
+  const fromEnv = process.env.DAIKIN_TOKENS_JSON?.trim();
+  if (fromEnv) {
+    const token = parseTokenJson(fromEnv);
+    if (token) {
+      return token;
+    }
+  }
+
+  try {
+    const raw = await fs.readFile(tokenFile, "utf8");
+    return parseTokenJson(raw);
   } catch {
     return null;
   }
