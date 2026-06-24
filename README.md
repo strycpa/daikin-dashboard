@@ -13,8 +13,8 @@ Next.js dashboard for controlling multiple Daikin Comfora units via the Onecta c
 ## Setup
 
 1. Register an app at [Daikin Developer Portal](https://developer.cloud.daikineurope.com/)
-2. Set redirect URI to your **production** Cloud Run host (Daikin allows only one app / one URI):
-   `your-service.europe-west1.run.app/api/auth/callback` (no `http://`)
+2. Set redirect URI to your **production** Cloud Run callback (must include `https://`):
+   `https://your-service.europe-west1.run.app/api/auth/callback`
 3. Copy credentials:
 
 ```bash
@@ -42,13 +42,13 @@ Open http://localhost:3000 and complete OAuth via the connect panel.
 Daikin Developer Portal allows **one redirect URI** per app. Point it at production:
 
 ```text
-daikin-dashboard-XXXX.europe-west1.run.app/api/auth/callback
+https://daikin-dashboard-XXXX.europe-west1.run.app/api/auth/callback
 ```
 
 In local `.env` set the same value:
 
 ```env
-DAIKIN_REDIRECT_URI=daikin-dashboard-XXXX.europe-west1.run.app/api/auth/callback
+DAIKIN_REDIRECT_URI=https://daikin-dashboard-XXXX.europe-west1.run.app/api/auth/callback
 ```
 
 After Daikin consent, the production `/api/auth/callback` reads `state` and redirects the
@@ -62,10 +62,11 @@ DAIKIN_OAUTH_RETURN_URI=http://localhost:3000/api/auth/callback
 DAIKIN_PUBLIC_URL=https://daikin-dashboard-XXXX.europe-west1.run.app
 ```
 
-### OAuth without proxy (legacy manual flow)
+### OAuth without proxy (localhost only)
 
-If redirect URI is `localhost:3000/...` without `http://`, the browser cannot open it after consent.
-Use the manual paste flow in the connect panel, or switch to the shared production proxy above.
+If `DAIKIN_REDIRECT_URI` points directly at `http://localhost:3000/api/auth/callback`, use the
+manual paste flow in the connect panel. For a single shared Daikin app, prefer the production
+`https://` proxy callback above.
 
 ## API rate limits
 
@@ -106,11 +107,11 @@ gcloud run deploy daikin-dashboard \
   --region europe-west1 \
   --allow-unauthenticated \
   --memory 512Mi \
-  --set-env-vars DAIKIN_REDIRECT_URI=YOUR_SERVICE_HOSTNAME/api/auth/callback,DAIKIN_TOKEN_BACKEND=firestore,DAIKIN_HOUSEHOLD_ID=Strejdomov,GCP_PROJECT_ID=YOUR_GCP_PROJECT,DAIKIN_TOKEN_FILE=/app/.data/tokens.json \
+  --set-env-vars DAIKIN_REDIRECT_URI=https://YOUR_SERVICE_HOSTNAME/api/auth/callback,DAIKIN_TOKEN_BACKEND=firestore,DAIKIN_HOUSEHOLD_ID=Strejdomov,GCP_PROJECT_ID=YOUR_GCP_PROJECT,DAIKIN_TOKEN_FILE=/app/.data/tokens.json \
   --set-secrets DAIKIN_CLIENT_ID=daikin-client-id:latest,DAIKIN_CLIENT_SECRET=daikin-client-secret:latest,DAIKIN_TOKENS_JSON=daikin-tokens-json:latest,DASHBOARD_ACCESS_TOKEN=daikin-dashboard-access-token:latest
 ```
 
-Replace `YOUR_SERVICE_HOSTNAME` with the Cloud Run host **without** `https://`, e.g. `daikin-dashboard-123456.europe-west1.run.app` — same format as Daikin Developer Portal expects.
+Replace `YOUR_SERVICE_HOSTNAME` with the Cloud Run host, e.g. `daikin-dashboard-123456.europe-west1.run.app` — include `https://` in `DAIKIN_REDIRECT_URI` and in the Daikin Developer Portal.
 
 After the first deploy, note the URL:
 
@@ -121,7 +122,7 @@ gcloud run services describe daikin-dashboard --region europe-west1 --format='va
 Register redirect URI in Daikin portal:
 
 ```text
-daikin-dashboard-XXXX.europe-west1.run.app/api/auth/callback
+https://daikin-dashboard-XXXX.europe-west1.run.app/api/auth/callback
 ```
 
 Update `DAIKIN_REDIRECT_URI` to match and redeploy if needed.

@@ -1,6 +1,10 @@
 import path from "node:path";
-import { usesManualOAuthRedirect } from "./oauth";
-import { buildAllowedOAuthReturnUris } from "./oauth-state";
+import { usesManualOAuthRedirect, normalizeRedirectUriForOAuth } from "./oauth";
+import {
+  buildAllowedOAuthReturnUris,
+  normalizeOAuthEndpoint,
+  resolveOAuthReturnUri,
+} from "./oauth-state";
 import type { TokenBackend, TokenStoreContext } from "./token-store";
 
 export const DEFAULT_HOUSEHOLD_ID = "Strejdomov";
@@ -12,13 +16,13 @@ export const API_BASE_URL = "https://api.onecta.daikineurope.com";
 export const DEFAULT_SCOPE =
   "openid onecta:basic.integration offline_access";
 
-/** Matches Daikin Developer Portal format (no http:// prefix). */
-export const DEFAULT_REDIRECT_URI = "localhost:3000/api/auth/callback";
+/** Default local callback when DAIKIN_REDIRECT_URI is unset. */
+export const DEFAULT_REDIRECT_URI = "http://localhost:3000/api/auth/callback";
 
 export interface DaikinConfig {
   clientId: string;
   clientSecret: string;
-  /** Redirect URI registered in Daikin Developer Portal (often without scheme). */
+  /** Redirect URI registered in Daikin Developer Portal (must include https://). */
   redirectUri: string;
   manualOAuth: boolean;
   /** Whether OAuth completes via the shared prod callback proxy. */
@@ -99,16 +103,26 @@ export function loadDaikinConfig(): DaikinConfig {
     process.env.DAIKIN_DEMO_MODE === "true" ||
     (!clientId && process.env.NODE_ENV === "development");
 
-  const redirectUri =
-    process.env.DAIKIN_REDIRECT_URI?.trim() || DEFAULT_REDIRECT_URI;
+  const redirectUri = normalizeRedirectUriForOAuth(
+    process.env.DAIKIN_REDIRECT_URI?.trim() || DEFAULT_REDIRECT_URI,
+  );
   const manualOAuth = usesManualOAuthRedirect(redirectUri);
+
+  let usesOAuthProxyFlag = false;
+  try {
+    usesOAuthProxyFlag =
+      normalizeOAuthEndpoint(redirectUri) !==
+      normalizeOAuthEndpoint(resolveOAuthReturnUri());
+  } catch {
+    usesOAuthProxyFlag = process.env.NODE_ENV === "development";
+  }
 
   return {
     clientId,
     clientSecret,
     redirectUri,
     manualOAuth,
-    usesOAuthProxy: manualOAuth,
+    usesOAuthProxy: usesOAuthProxyFlag,
     oauthAllowedReturnUris: buildAllowedOAuthReturnUris(),
     tokenFile:
       process.env.DAIKIN_TOKEN_FILE?.trim() ??

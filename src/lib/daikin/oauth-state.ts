@@ -1,3 +1,5 @@
+import { normalizeRedirectUriForOAuth } from "./oauth";
+
 export interface OAuthProxyState {
   v: 1;
   /** Random nonce stored in the initiating app's cookie. */
@@ -38,8 +40,7 @@ function isOAuthProxyState(value: unknown): value is OAuthProxyState {
 }
 
 export function normalizeOAuthEndpoint(uri: string): string {
-  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(uri) ? uri : `http://${uri}`;
-  const parsed = new URL(withScheme);
+  const parsed = new URL(normalizeRedirectUriForOAuth(uri));
   return `${parsed.host}${parsed.pathname}`.toLowerCase();
 }
 
@@ -90,9 +91,8 @@ export function buildAllowedOAuthReturnUris(): string[] {
   }
 
   const registeredRedirect = process.env.DAIKIN_REDIRECT_URI?.trim();
-  if (registeredRedirect && !registeredRedirect.includes("localhost")) {
-    const hostPath = registeredRedirect.replace(/^https?:\/\//i, "");
-    defaults.push(`https://${hostPath}`);
+  if (registeredRedirect) {
+    defaults.push(normalizeRedirectUriForOAuth(registeredRedirect));
   }
 
   return [...new Set([...defaults, ...fromEnv])];

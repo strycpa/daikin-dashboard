@@ -296,7 +296,7 @@ SERVICE_URL=""
 PRODUCTION_REDIRECT=""
 
 if [[ "${SKIP_DEPLOY:-}" != "1" ]]; then
-  PLACEHOLDER_REDIRECT="daikin-dashboard-placeholder.${REGION}.run.app/api/auth/callback"
+  PLACEHOLDER_REDIRECT="https://daikin-dashboard-placeholder.${REGION}.run.app/api/auth/callback"
 
   echo "==> Cloud Run deploy (first pass)"
   gcloud run deploy "${SERVICE_NAME}" \
@@ -315,8 +315,7 @@ if [[ "${SKIP_DEPLOY:-}" != "1" ]]; then
     --project="${GCP_PROJECT_ID}" \
     --region="${REGION}" \
     --format='value(status.url)')"
-  SERVICE_HOST="${SERVICE_URL#https://}"
-  PRODUCTION_REDIRECT="${SERVICE_HOST}/api/auth/callback"
+  PRODUCTION_REDIRECT="${SERVICE_URL}/api/auth/callback"
 
   echo "==> Cloud Run redirect URI: ${PRODUCTION_REDIRECT}"
   gcloud run services update "${SERVICE_NAME}" \
@@ -375,7 +374,7 @@ Secrets in Secret Manager:
 
 Dashboard login: HTTP Basic, password = DASHBOARD_ACCESS_TOKEN
 
-Daikin Developer Portal redirect (no https://):
+Daikin Developer Portal redirect URI:
   ${PRODUCTION_REDIRECT:-<after deploy>}
 
 Re-run after local OAuth to seed Firestore (first login on Cloud Run also migrates legacy secret):

@@ -1,5 +1,28 @@
+/** Ensures redirect_uri sent to Daikin includes an explicit scheme. */
+export function normalizeRedirectUriForOAuth(redirectUri: string): string {
+  const trimmed = redirectUri.trim();
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  if (/^https:\/\//i.test(trimmed) || /^http:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  const isLocalhost =
+    /^localhost(?::\d+)?(?:\/|$)/i.test(trimmed) ||
+    /^127\.0\.0\.1(?::\d+)?(?:\/|$)/i.test(trimmed);
+
+  return `${isLocalhost ? "http" : "https"}://${trimmed}`;
+}
+
 export function usesManualOAuthRedirect(redirectUri: string): boolean {
-  return !/^https?:\/\//i.test(redirectUri);
+  try {
+    const parsed = new URL(normalizeRedirectUriForOAuth(redirectUri));
+    return parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
 }
 
 export function parseOAuthInput(input: string): {
@@ -12,9 +35,13 @@ export function parseOAuthInput(input: string): {
   }
 
   if (trimmed.includes("code=")) {
-    const urlText = /^[a-z][a-z0-9+.-]*:/i.test(trimmed)
-      ? trimmed
-      : `http://${trimmed}`;
+    let urlText = trimmed;
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+      const queryIndex = trimmed.indexOf("?");
+      const pathPart = queryIndex >= 0 ? trimmed.slice(0, queryIndex) : trimmed;
+      const queryPart = queryIndex >= 0 ? trimmed.slice(queryIndex) : "";
+      urlText = normalizeRedirectUriForOAuth(pathPart) + queryPart;
+    }
 
     let url: URL;
     try {

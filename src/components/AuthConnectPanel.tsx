@@ -157,8 +157,8 @@ export function AuthConnectPanel({
               2
             </span>
             <span>
-              Po souhlasu tě Daikin vrátí přes proxy callback — přihlášení by mělo
-              proběhnout automaticky.
+              Po souhlasu tě Daikin vrátí na callback — přihlášení by mělo proběhnout
+              automaticky.
             </span>
           </li>
         )}
