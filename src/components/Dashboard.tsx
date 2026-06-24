@@ -19,6 +19,8 @@ interface AuthStatus {
   redirectUri?: string;
   manualOAuth?: boolean;
   usesOAuthProxy?: boolean;
+  householdId?: string;
+  tokenBackend?: "firestore" | "file";
 }
 
 export function Dashboard() {
@@ -89,7 +91,7 @@ export function Dashboard() {
     return nextUnits;
   }, []);
 
-  const refresh = useCallback(async () => {
+  const refreshData = useCallback(async () => {
     setError(null);
     setLoading(true);
 
@@ -109,9 +111,46 @@ export function Dashboard() {
     }
   }, [loadAuth, loadSites, loadUnits, siteId]);
 
+  const startDaikinReauth = useCallback(async () => {
+    setError(null);
+    setBusy(true);
+
+    try {
+      const response = await fetch("/api/auth/url");
+      const data = (await response.json()) as {
+        url?: string;
+        message?: string;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? data.message ?? "Nepodařilo se vytvořit OAuth URL");
+      }
+
+      if (!data.url) {
+        await refreshData();
+        return;
+      }
+
+      window.location.assign(data.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Přesměrování na Daikin selhalo");
+      setBusy(false);
+    }
+  }, [refreshData]);
+
+  const handleRefreshClick = useCallback(async () => {
+    if (auth?.demoMode) {
+      await refreshData();
+      return;
+    }
+
+    await startDaikinReauth();
+  }, [auth?.demoMode, refreshData, startDaikinReauth]);
+
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    void refreshData();
+  }, [refreshData]);
 
   useEffect(() => {
     if (!auth?.authenticated) {
@@ -129,21 +168,34 @@ export function Dashboard() {
     const message = params.get("message");
 
     if (authResult === "success") {
-      setNotice("Připojeno k Daikin cloudu.");
       window.history.replaceState({}, "", "/");
-      void refresh();
+      void loadAuth().then((status) => {
+        const household = status.householdId ?? "Strejdomov";
+        setNotice(
+          status.tokenBackend === "firestore"
+            ? `Připojeno k Daikin cloudu. Token uložen do Firestore pro domácnost „${household}".`
+            : "Připojeno k Daikin cloudu.",
+        );
+        void refreshData();
+      });
     }
 
     if (authResult === "error") {
       setError(message ?? "OAuth selhalo");
       window.history.replaceState({}, "", "/");
     }
-  }, [refresh]);
+  }, [loadAuth, refreshData]);
 
   const handleAuthConnected = async () => {
-    setNotice("Připojeno k Daikin cloudu.");
+    const status = await loadAuth();
+    const household = status.householdId ?? "Strejdomov";
+    setNotice(
+      status.tokenBackend === "firestore"
+        ? `Připojeno k Daikin cloudu. Token uložen do Firestore pro domácnost „${household}".`
+        : "Připojeno k Daikin cloudu.",
+    );
     setError(null);
-    await refresh();
+    await refreshData();
   };
 
   const postControl = async (
@@ -230,6 +282,11 @@ export function Dashboard() {
           </h1>
           <p className="mt-2 max-w-xl text-sm text-slate-400">
             Ovládání všech jednotek z jednoho místa přes Onecta cloud API.
+            {auth?.householdId && !auth.demoMode && (
+              <span className="mt-1 block text-xs text-slate-500">
+                Domácnost: {auth.householdId}
+              </span>
+            )}
           </p>
         </div>
 
@@ -248,8 +305,12 @@ export function Dashboard() {
             </select>
           )}
 
-          <Button variant="secondary" onClick={() => void refresh()} disabled={loading}>
-            {loading ? "Načítám…" : "Obnovit"}
+          <Button
+            variant="secondary"
+            onClick={() => void handleRefreshClick()}
+            disabled={loading || busy}
+          >
+            {loading || busy ? "Načítám…" : "Obnovit"}
           </Button>
         </div>
       </header>
@@ -312,8 +373,8 @@ export function Dashboard() {
                   kombinace = prázdný seznam
                 </li>
                 <li>
-                  Po opravě smaž <code className="text-amber-50">.data/tokens.json</code>{" "}
-                  a přihlas se znovu
+                  Po opravě klikni na <strong>Obnovit</strong> a přihlas se znovu u
+                  Daikin
                 </li>
               </ul>
             </section>

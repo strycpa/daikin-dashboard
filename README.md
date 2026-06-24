@@ -106,7 +106,7 @@ gcloud run deploy daikin-dashboard \
   --region europe-west1 \
   --allow-unauthenticated \
   --memory 512Mi \
-  --set-env-vars DAIKIN_REDIRECT_URI=YOUR_SERVICE_HOSTNAME/api/auth/callback,DAIKIN_TOKEN_FILE=/app/.data/tokens.json \
+  --set-env-vars DAIKIN_REDIRECT_URI=YOUR_SERVICE_HOSTNAME/api/auth/callback,DAIKIN_TOKEN_BACKEND=firestore,DAIKIN_HOUSEHOLD_ID=Strejdomov,GCP_PROJECT_ID=YOUR_GCP_PROJECT,DAIKIN_TOKEN_FILE=/app/.data/tokens.json \
   --set-secrets DAIKIN_CLIENT_ID=daikin-client-id:latest,DAIKIN_CLIENT_SECRET=daikin-client-secret:latest,DAIKIN_TOKENS_JSON=daikin-tokens-json:latest,DASHBOARD_ACCESS_TOKEN=daikin-dashboard-access-token:latest
 ```
 
@@ -126,11 +126,33 @@ daikin-dashboard-XXXX.europe-west1.run.app/api/auth/callback
 
 Update `DAIKIN_REDIRECT_URI` to match and redeploy if needed.
 
-### 4. OAuth on production
+### 4. OAuth and token storage (Firestore)
+
+Tokens are stored in **Firestore** per household (default id `Strejdomov`):
+
+```text
+households/{householdId}/tokens/{tokenId}
+  isCurrent: true
+  access_token, refresh_token, expires_at, ...
+```
 
 1. Open the Cloud Run URL (browser prompts for Basic auth if `DASHBOARD_ACCESS_TOKEN` is set).
-2. Complete Daikin login via the connect panel (manual code paste still works if Daikin uses scheme-less redirect).
-3. Refresh tokens are cached in the container filesystem; for durable cold starts keep `daikin-tokens-json` secret updated from `.data/tokens.json` after re-auth.
+2. Complete Daikin login via the connect panel, or click **Obnovit** to re-authenticate.
+3. The new token is saved to Firestore and marked as current; older tokens for the same household are unmarked.
+
+**Existing Cloud Run deployment** — enable Firestore and update env vars:
+
+```bash
+gcloud services enable firestore.googleapis.com --project=daikin-dashboard-prod
+gcloud firestore databases create --location=europe-west1 --type=firestore-native --project=daikin-dashboard-prod  # if missing
+gcloud projects add-iam-policy-binding daikin-dashboard-prod \
+  --member="serviceAccount:daikin-dashboard@daikin-dashboard-prod.iam.gserviceaccount.com" \
+  --role="roles/datastore.user"
+gcloud run services update daikin-dashboard --region=europe-west1 \
+  --update-env-vars DAIKIN_TOKEN_BACKEND=firestore,DAIKIN_HOUSEHOLD_ID=Strejdomov,GCP_PROJECT_ID=daikin-dashboard-prod
+```
+
+Legacy `daikin-tokens-json` secret is still read once and migrated to Firestore on first API call if Firestore is empty.
 
 ### 5. Health check
 
@@ -153,7 +175,7 @@ export GITHUB_REPO=daikin-dashboard
 ./scripts/setup-gcp.sh
 ```
 
-Creates: APIs, Artifact Registry, runtime service account, Secret Manager secrets,
+Creates: APIs, Artifact Registry, Firestore, runtime service account, Secret Manager secrets,
 Cloud Run service, IAM for Cloud Build, GitHub trigger on `master`.
 
 If GitHub is not connected yet, the script prints console URL to link it and re-run.

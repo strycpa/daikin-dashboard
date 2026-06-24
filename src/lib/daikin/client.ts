@@ -1,6 +1,6 @@
-import { loadDaikinConfig, requireCredentials } from "./config";
+import { loadDaikinConfig, requireCredentials, getTokenStoreContext } from "./config";
 import { DEFAULT_MODE, getClimatePoint, parseGatewayDevices } from "./parser";
-import { readTokenFile, writeTokenFile } from "./token-store";
+import { readStoredToken, writeStoredToken } from "./token-store";
 import type {
   DaikinSite,
   DaikinTokenSet,
@@ -87,7 +87,7 @@ export async function getAccessToken(): Promise<string> {
   const config = loadDaikinConfig();
   requireCredentials(config);
 
-  const stored = await readTokenFile(config.tokenFile);
+  const stored = await readStoredToken(getTokenStoreContext(config));
   if (!stored?.access_token) {
     throw new Error("Not authenticated. Complete OAuth flow first.");
   }
@@ -110,7 +110,7 @@ export async function getAccessToken(): Promise<string> {
     refresh_token: stored.refresh_token,
   });
 
-  await writeTokenFile(config.tokenFile, refreshed);
+  await writeStoredToken(getTokenStoreContext(config), refreshed);
   if (!refreshed.access_token) {
     throw new Error("Refresh response did not include access_token");
   }
@@ -144,7 +144,7 @@ export async function exchangeAuthorizationCode(code: string): Promise<void> {
     code,
   });
 
-  await writeTokenFile(config.tokenFile, token);
+  await writeStoredToken(getTokenStoreContext(config), token);
 }
 
 export async function getAuthStatus(): Promise<{
@@ -154,6 +154,8 @@ export async function getAuthStatus(): Promise<{
   redirectUri: string;
   manualOAuth: boolean;
   usesOAuthProxy: boolean;
+  householdId: string;
+  tokenBackend: "firestore" | "file";
 }> {
   const config = loadDaikinConfig();
 
@@ -165,10 +167,12 @@ export async function getAuthStatus(): Promise<{
       redirectUri: config.redirectUri,
       manualOAuth: config.manualOAuth,
       usesOAuthProxy: config.usesOAuthProxy,
+      householdId: config.householdId,
+      tokenBackend: config.tokenBackend,
     };
   }
 
-  const token = await readTokenFile(config.tokenFile);
+  const token = await readStoredToken(getTokenStoreContext(config));
   return {
     authenticated: Boolean(token?.access_token),
     demoMode: false,
@@ -176,6 +180,8 @@ export async function getAuthStatus(): Promise<{
     redirectUri: config.redirectUri,
     manualOAuth: config.manualOAuth,
     usesOAuthProxy: config.usesOAuthProxy,
+    householdId: config.householdId,
+    tokenBackend: config.tokenBackend,
   };
 }
 

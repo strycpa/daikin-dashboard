@@ -170,9 +170,20 @@ gcloud services enable \
   run.googleapis.com \
   artifactregistry.googleapis.com \
   secretmanager.googleapis.com \
+  firestore.googleapis.com \
   iam.googleapis.com \
   cloudresourcemanager.googleapis.com \
   --project="${GCP_PROJECT_ID}"
+
+echo "==> Firestore (Native mode)"
+if ! gcloud firestore databases describe --database="(default)" \
+  --project="${GCP_PROJECT_ID}" >/dev/null 2>&1; then
+  gcloud firestore databases create \
+    --database="(default)" \
+    --location="${REGION}" \
+    --type=firestore-native \
+    --project="${GCP_PROJECT_ID}"
+fi
 
 echo "==> Artifact Registry: ${AR_REPO}"
 create_ar_repo() {
@@ -224,10 +235,17 @@ gcloud iam service-accounts add-iam-policy-binding "${RUNTIME_SA_EMAIL}" \
   --role="roles/iam.serviceAccountUser" \
   --quiet >/dev/null
 
+gcloud projects add-iam-policy-binding "${GCP_PROJECT_ID}" \
+  --member="${RUNTIME_SA_MEMBER}" \
+  --role="roles/datastore.user" \
+  --quiet >/dev/null
+
 echo "==> Secret Manager"
 DAIKIN_CLIENT_ID="$(read_env DAIKIN_CLIENT_ID || true)"
 DAIKIN_CLIENT_SECRET="$(read_env DAIKIN_CLIENT_SECRET || true)"
 DASHBOARD_ACCESS_TOKEN="$(read_env DASHBOARD_ACCESS_TOKEN || true)"
+DAIKIN_HOUSEHOLD_ID="$(read_env DAIKIN_HOUSEHOLD_ID || true)"
+DAIKIN_HOUSEHOLD_ID="${DAIKIN_HOUSEHOLD_ID:-Strejdomov}"
 
 if [[ -z "${DAIKIN_CLIENT_ID}" || -z "${DAIKIN_CLIENT_SECRET}" ]]; then
   echo "ERROR: DAIKIN_CLIENT_ID and DAIKIN_CLIENT_SECRET required in ${ENV_FILE}"
@@ -289,7 +307,7 @@ if [[ "${SKIP_DEPLOY:-}" != "1" ]]; then
     --service-account="${RUNTIME_SA_EMAIL}" \
     --allow-unauthenticated \
     --memory=512Mi \
-    --set-env-vars "DAIKIN_REDIRECT_URI=${PLACEHOLDER_REDIRECT},DAIKIN_TOKEN_FILE=/app/.data/tokens.json" \
+    --set-env-vars "DAIKIN_REDIRECT_URI=${PLACEHOLDER_REDIRECT},DAIKIN_TOKEN_FILE=/app/.data/tokens.json,DAIKIN_TOKEN_BACKEND=firestore,DAIKIN_HOUSEHOLD_ID=${DAIKIN_HOUSEHOLD_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID}" \
     --set-secrets "DAIKIN_CLIENT_ID=daikin-client-id:latest,DAIKIN_CLIENT_SECRET=daikin-client-secret:latest,DAIKIN_TOKENS_JSON=daikin-tokens-json:latest,DASHBOARD_ACCESS_TOKEN=daikin-dashboard-access-token:latest" \
     --quiet
 
@@ -304,7 +322,7 @@ if [[ "${SKIP_DEPLOY:-}" != "1" ]]; then
   gcloud run services update "${SERVICE_NAME}" \
     --project="${GCP_PROJECT_ID}" \
     --region="${REGION}" \
-    --update-env-vars "DAIKIN_REDIRECT_URI=${PRODUCTION_REDIRECT},DAIKIN_PUBLIC_URL=${SERVICE_URL}" \
+    --update-env-vars "DAIKIN_REDIRECT_URI=${PRODUCTION_REDIRECT},DAIKIN_PUBLIC_URL=${SERVICE_URL},DAIKIN_TOKEN_BACKEND=firestore,DAIKIN_HOUSEHOLD_ID=${DAIKIN_HOUSEHOLD_ID},GCP_PROJECT_ID=${GCP_PROJECT_ID}" \
     --quiet
 fi
 
@@ -346,6 +364,9 @@ Service:    ${SERVICE_NAME}
 URL:        ${SERVICE_URL:-skipped}
 Redirect:   ${PRODUCTION_REDIRECT:-set after deploy}
 
+Household:   ${DAIKIN_HOUSEHOLD_ID}
+Token store: Firestore (households/${DAIKIN_HOUSEHOLD_ID}/tokens)
+
 Secrets in Secret Manager:
   - daikin-client-id
   - daikin-client-secret
@@ -357,7 +378,7 @@ Dashboard login: HTTP Basic, password = DASHBOARD_ACCESS_TOKEN
 Daikin Developer Portal redirect (no https://):
   ${PRODUCTION_REDIRECT:-<after deploy>}
 
-Re-run after local OAuth to refresh tokens:
+Re-run after local OAuth to seed Firestore (first login on Cloud Run also migrates legacy secret):
   gcloud secrets versions add daikin-tokens-json --data-file=.data/tokens.json --project=${GCP_PROJECT_ID}
 
 Test CD pipeline:

@@ -1,6 +1,9 @@
 import path from "node:path";
 import { usesManualOAuthRedirect } from "./oauth";
 import { buildAllowedOAuthReturnUris } from "./oauth-state";
+import type { TokenBackend, TokenStoreContext } from "./token-store";
+
+export const DEFAULT_HOUSEHOLD_ID = "Strejdomov";
 
 export const AUTHORIZE_URL =
   "https://idp.onecta.daikineurope.com/v1/oidc/authorize";
@@ -22,6 +25,9 @@ export interface DaikinConfig {
   usesOAuthProxy: boolean;
   oauthAllowedReturnUris: string[];
   tokenFile: string;
+  householdId: string;
+  tokenBackend: TokenBackend;
+  gcpProjectId: string | null;
   siteId: string | null;
   roomLabels: Record<string, string>;
   demoMode: boolean;
@@ -50,6 +56,42 @@ function parseRoomLabels(raw: string | undefined): Record<string, string> {
   }
 }
 
+function resolveTokenBackend(): TokenBackend {
+  const explicit = process.env.DAIKIN_TOKEN_BACKEND?.trim().toLowerCase();
+  if (explicit === "file") {
+    return "file";
+  }
+  if (explicit === "firestore") {
+    return "firestore";
+  }
+
+  const projectId =
+    process.env.GCP_PROJECT_ID?.trim() ||
+    process.env.GOOGLE_CLOUD_PROJECT?.trim();
+  if (projectId) {
+    return "firestore";
+  }
+
+  return "file";
+}
+
+function resolveGcpProjectId(): string | null {
+  return (
+    process.env.GCP_PROJECT_ID?.trim() ||
+    process.env.GOOGLE_CLOUD_PROJECT?.trim() ||
+    null
+  );
+}
+
+export function getTokenStoreContext(config: DaikinConfig): TokenStoreContext {
+  return {
+    backend: config.tokenBackend,
+    householdId: config.householdId,
+    tokenFile: config.tokenFile,
+    gcpProjectId: config.gcpProjectId,
+  };
+}
+
 export function loadDaikinConfig(): DaikinConfig {
   const clientId = process.env.DAIKIN_CLIENT_ID?.trim() ?? "";
   const clientSecret = process.env.DAIKIN_CLIENT_SECRET?.trim() ?? "";
@@ -71,6 +113,9 @@ export function loadDaikinConfig(): DaikinConfig {
     tokenFile:
       process.env.DAIKIN_TOKEN_FILE?.trim() ??
       path.join(process.cwd(), ".data", "tokens.json"),
+    householdId: process.env.DAIKIN_HOUSEHOLD_ID?.trim() || DEFAULT_HOUSEHOLD_ID,
+    tokenBackend: resolveTokenBackend(),
+    gcpProjectId: resolveGcpProjectId(),
     siteId: process.env.DAIKIN_SITE_ID?.trim() || null,
     roomLabels: parseRoomLabels(process.env.DAIKIN_ROOM_LABELS),
     demoMode,
