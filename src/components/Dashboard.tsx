@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DaikinSite, DevicesMeta, OperationMode, UnitStatus } from "@/lib/daikin/types";
 import {
   averageRoomTemp,
@@ -38,6 +38,9 @@ export function Dashboard() {
   const [draftSetpoint, setDraftSetpoint] = useState(22);
   const [draftFan, setDraftFan] = useState(3);
   const [draftMode, setDraftMode] = useState<OperationMode>("cooling");
+  const siteIdRef = useRef<string | null>(siteId);
+
+  siteIdRef.current = siteId;
 
   const loadAuth = useCallback(async () => {
     const response = await fetch("/api/auth/status");
@@ -59,13 +62,8 @@ export function Dashboard() {
 
     const nextSites = data.sites ?? [];
     setSites(nextSites);
-
-    if (!siteId && nextSites.length > 0) {
-      setSiteId(nextSites[0].id);
-    }
-
     return nextSites;
-  }, [siteId]);
+  }, []);
 
   const loadUnits = useCallback(async (activeSiteId: string | null) => {
     const query = activeSiteId ? `?siteId=${encodeURIComponent(activeSiteId)}` : "";
@@ -91,25 +89,39 @@ export function Dashboard() {
     return nextUnits;
   }, []);
 
-  const refreshData = useCallback(async () => {
-    setError(null);
-    setLoading(true);
+  const refreshData = useCallback(
+    async (preferredSiteId?: string | null) => {
+      setError(null);
+      setLoading(true);
 
-    try {
-      const authStatus = await loadAuth();
-      if (!authStatus.authenticated) {
-        setUnits([]);
-        return;
+      try {
+        const authStatus = await loadAuth();
+        if (!authStatus.authenticated) {
+          setUnits([]);
+          setSites([]);
+          return;
+        }
+
+        const nextSites = await loadSites();
+        const activeSiteId =
+          preferredSiteId ??
+          siteIdRef.current ??
+          nextSites[0]?.id ??
+          null;
+
+        if (activeSiteId !== siteIdRef.current) {
+          setSiteId(activeSiteId);
+        }
+
+        await loadUnits(activeSiteId);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Refresh failed");
+      } finally {
+        setLoading(false);
       }
-
-      await loadSites();
-      await loadUnits(siteId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Refresh failed");
-    } finally {
-      setLoading(false);
-    }
-  }, [loadAuth, loadSites, loadUnits, siteId]);
+    },
+    [loadAuth, loadSites, loadUnits],
+  );
 
   const startDaikinReauth = useCallback(async () => {
     setError(null);
@@ -159,28 +171,31 @@ export function Dashboard() {
     return () => {
       cancelled = true;
     };
-  }, [refreshData]);
+    // Initial load only — site changes are handled explicitly in the selector.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  useEffect(() => {
-    if (!auth?.authenticated) {
-      return;
-    }
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        await loadUnits(siteId);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load units");
-        }
+  const handleSiteChange = useCallback(
+    (nextSiteId: string | null) => {
+      setSiteId(nextSiteId);
+      if (!auth?.authenticated || !nextSiteId) {
+        return;
       }
-    })();
 
-    return () => {
-      cancelled = true;
-    };
-  }, [auth?.authenticated, loadUnits, siteId]);
+      void (async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          await loadUnits(nextSiteId);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Failed to load units");
+        } finally {
+          setLoading(false);
+        }
+      })();
+    },
+    [auth?.authenticated, loadUnits],
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -355,7 +370,9 @@ export function Dashboard() {
           {sites.length > 1 && (
             <select
               value={siteId ?? ""}
-              onChange={(event) => setSiteId(event.target.value || null)}
+              onChange={(event) =>
+                handleSiteChange(event.target.value || null)
+              }
               className="rounded-xl border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-slate-100"
             >
               {sites.map((site) => (
