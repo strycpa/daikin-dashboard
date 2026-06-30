@@ -351,16 +351,16 @@ export function Dashboard() {
     <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.25em] text-teal-400/70">
+          <p className="text-xs uppercase tracking-[0.25em] text-teal-400/70 [html[data-theme='light']_&]:text-teal-600">
             Daikin Comfora
           </p>
-          <h1 className="bg-gradient-to-r from-white via-teal-100 to-cyan-300 bg-clip-text text-3xl font-bold text-transparent sm:text-4xl">
+          <h1 className="bg-gradient-to-r from-white via-teal-100 to-cyan-300 bg-clip-text text-3xl font-bold text-transparent sm:text-4xl [html[data-theme='light']_&]:from-slate-900 [html[data-theme='light']_&]:via-teal-700 [html[data-theme='light']_&]:to-cyan-600">
             Climate Dashboard
           </h1>
-          <p className="mt-2 max-w-xl text-sm text-slate-400">
+          <p className="mt-2 max-w-xl text-sm text-slate-400 [html[data-theme='light']_&]:text-slate-600">
             Ovládání všech jednotek z jednoho místa přes Onecta cloud API.
             {auth?.householdId && !auth.demoMode && (
-              <span className="mt-1 block text-xs text-slate-500">
+              <span className="mt-1 block text-xs text-slate-500 [html[data-theme='light']_&]:text-slate-500">
                 Domácnost: {auth.householdId}
               </span>
             )}
