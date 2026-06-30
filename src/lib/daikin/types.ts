@@ -143,3 +143,9 @@ export interface DevicesResponse {
   units: UnitStatus[];
   meta: DevicesMeta;
 }
+
+export interface FetchUnitsOptions {
+  /** Gateway device IDs from a prior /v1/sites response — skips re-fetching sites. */
+  gatewayDeviceIds?: string[];
+  knownSiteCount?: number;
+}

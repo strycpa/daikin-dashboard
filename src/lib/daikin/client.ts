@@ -10,6 +10,7 @@ import type {
   DaikinTokenSet,
   DevicesMeta,
   DevicesResponse,
+  FetchUnitsOptions,
   GatewayDevice,
   OperationMode,
   UnitControlPayload,
@@ -208,7 +209,10 @@ export async function fetchGatewayDevices(): Promise<GatewayDevice[]> {
   return apiFetch<GatewayDevice[]>("/v1/gateway-devices");
 }
 
-export async function fetchUnits(siteId: string | null): Promise<DevicesResponse> {
+export async function fetchUnits(
+  siteId: string | null,
+  options?: FetchUnitsOptions,
+): Promise<DevicesResponse> {
   const config = loadDaikinConfig();
 
   if (config.demoMode) {
@@ -227,26 +231,29 @@ export async function fetchUnits(siteId: string | null): Promise<DevicesResponse
     };
   }
 
-  const [devices, sites] = await Promise.all([
-    fetchGatewayDevices(),
-    fetchSites(),
-  ]);
-
   const effectiveSiteId = siteId ?? config.siteId;
-  let siteDeviceIds: string[] | undefined;
+  const devices = await fetchGatewayDevices();
+
+  let sites: DaikinSite[] = [];
+  let siteDeviceIds = options?.gatewayDeviceIds;
   let siteFilterActive = false;
 
-  if (effectiveSiteId) {
+  if (siteDeviceIds && siteDeviceIds.length > 0) {
+    siteFilterActive = Boolean(effectiveSiteId);
+  } else if (effectiveSiteId) {
+    sites = await fetchSites();
     const site = sites.find((item) => item.id === effectiveSiteId);
     const gatewayDevices = site?.gatewayDevices;
     if (gatewayDevices && gatewayDevices.length > 0) {
       siteDeviceIds = gatewayDevices;
       siteFilterActive = true;
     }
+  } else {
+    sites = await fetchSites();
   }
 
   const filteredDevices = siteDeviceIds
-    ? devices.filter((device) => siteDeviceIds?.includes(device.id))
+    ? devices.filter((device) => siteDeviceIds.includes(device.id))
     : devices;
 
   let customDeviceNames: Record<string, { customName: string | null; cloudName: string | null }> = {};
@@ -295,7 +302,7 @@ export async function fetchUnits(siteId: string | null): Promise<DevicesResponse
 
   const meta: DevicesMeta = {
     rawGatewayCount: devices.length,
-    rawSiteCount: sites.length,
+    rawSiteCount: options?.knownSiteCount ?? sites.length,
     parsedUnitCount: units.length,
     skippedWithoutClimateControl,
     siteFilterActive,

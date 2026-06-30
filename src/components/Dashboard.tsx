@@ -23,6 +23,22 @@ interface AuthStatus {
   tokenBackend?: "firestore" | "file";
 }
 
+function gatewayDeviceIdsForSite(
+  sites: DaikinSite[],
+  activeSiteId: string | null,
+): string[] | undefined {
+  if (!activeSiteId) {
+    return undefined;
+  }
+
+  const gatewayDevices = sites.find((site) => site.id === activeSiteId)
+    ?.gatewayDevices;
+
+  return gatewayDevices && gatewayDevices.length > 0
+    ? gatewayDevices
+    : undefined;
+}
+
 export function Dashboard() {
   const [sites, setSites] = useState<DaikinSite[]>([]);
   const [siteId, setSiteId] = useState<string | null>(null);
@@ -39,8 +55,10 @@ export function Dashboard() {
   const [draftFan, setDraftFan] = useState(3);
   const [draftMode, setDraftMode] = useState<OperationMode>("cooling");
   const siteIdRef = useRef<string | null>(siteId);
+  const sitesRef = useRef<DaikinSite[]>(sites);
 
   siteIdRef.current = siteId;
+  sitesRef.current = sites;
 
   const loadAuth = useCallback(async () => {
     const response = await fetch("/api/auth/status");
@@ -65,29 +83,46 @@ export function Dashboard() {
     return nextSites;
   }, []);
 
-  const loadUnits = useCallback(async (activeSiteId: string | null) => {
-    const query = activeSiteId ? `?siteId=${encodeURIComponent(activeSiteId)}` : "";
-    const response = await fetch(`/api/devices${query}`);
-    const data = (await response.json()) as {
-      units?: UnitStatus[];
-      meta?: DevicesMeta;
-      error?: string;
-    };
+  const loadUnits = useCallback(
+    async (
+      activeSiteId: string | null,
+      knownSites: DaikinSite[] = sitesRef.current,
+    ) => {
+      const params = new URLSearchParams();
+      if (activeSiteId) {
+        params.set("siteId", activeSiteId);
+      }
 
-    if (!response.ok) {
-      throw new Error(data.error ?? "Failed to load units");
-    }
+      const gatewayDeviceIds = gatewayDeviceIdsForSite(knownSites, activeSiteId);
+      if (gatewayDeviceIds) {
+        params.set("gatewayDeviceIds", gatewayDeviceIds.join(","));
+        params.set("knownSiteCount", String(knownSites.length));
+      }
 
-    const nextUnits = data.units ?? [];
-    setUnits(nextUnits);
-    setDevicesMeta(data.meta ?? null);
-    setSelectedIds((current) => {
-      const valid = new Set(nextUnits.map((unit) => unit.id));
-      return new Set([...current].filter((id) => valid.has(id)));
-    });
+      const query = params.toString() ? `?${params.toString()}` : "";
+      const response = await fetch(`/api/devices${query}`);
+      const data = (await response.json()) as {
+        units?: UnitStatus[];
+        meta?: DevicesMeta;
+        error?: string;
+      };
 
-    return nextUnits;
-  }, []);
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to load units");
+      }
+
+      const nextUnits = data.units ?? [];
+      setUnits(nextUnits);
+      setDevicesMeta(data.meta ?? null);
+      setSelectedIds((current) => {
+        const valid = new Set(nextUnits.map((unit) => unit.id));
+        return new Set([...current].filter((id) => valid.has(id)));
+      });
+
+      return nextUnits;
+    },
+    [],
+  );
 
   const refreshData = useCallback(
     async (preferredSiteId?: string | null) => {
@@ -113,7 +148,7 @@ export function Dashboard() {
           setSiteId(activeSiteId);
         }
 
-        await loadUnits(activeSiteId);
+        await loadUnits(activeSiteId, nextSites);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Refresh failed");
       } finally {
