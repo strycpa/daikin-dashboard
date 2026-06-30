@@ -6,6 +6,7 @@ import {
   isAllowedOAuthReturnUri,
   resolveOAuthNonce,
 } from "@/lib/daikin/oauth-state";
+import { appRedirectUrl } from "@/lib/daikin/request-origin";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -14,13 +15,16 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     return NextResponse.redirect(
-      new URL(`/?auth=error&message=${encodeURIComponent(error)}`, request.url),
+      appRedirectUrl(
+        request,
+        `/?auth=error&message=${encodeURIComponent(error)}`,
+      ),
     );
   }
 
   if (!code || !state) {
     return NextResponse.redirect(
-      new URL("/?auth=error&message=missing_code", request.url),
+      appRedirectUrl(request, "/?auth=error&message=missing_code"),
     );
   }
 
@@ -30,7 +34,7 @@ export async function GET(request: NextRequest) {
   if (proxyState) {
     if (!isAllowedOAuthReturnUri(proxyState.returnTo, config.oauthAllowedReturnUris)) {
       return NextResponse.redirect(
-        new URL("/?auth=error&message=invalid_return_uri", request.url),
+        appRedirectUrl(request, "/?auth=error&message=invalid_return_uri"),
       );
     }
 
@@ -45,7 +49,7 @@ export async function GET(request: NextRequest) {
 
   if (!savedState || savedState !== nonce) {
     return NextResponse.redirect(
-      new URL("/?auth=error&message=invalid_state", request.url),
+      appRedirectUrl(request, "/?auth=error&message=invalid_state"),
     );
   }
 
@@ -53,11 +57,14 @@ export async function GET(request: NextRequest) {
 
   try {
     await exchangeAuthorizationCode(code);
-    return NextResponse.redirect(new URL("/?auth=success", request.url));
+    return NextResponse.redirect(appRedirectUrl(request, "/?auth=success"));
   } catch (err) {
     const message = err instanceof Error ? err.message : "auth_failed";
     return NextResponse.redirect(
-      new URL(`/?auth=error&message=${encodeURIComponent(message)}`, request.url),
+      appRedirectUrl(
+        request,
+        `/?auth=error&message=${encodeURIComponent(message)}`,
+      ),
     );
   }
 }

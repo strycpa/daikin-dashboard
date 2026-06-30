@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   const nonce = randomBytes(24).toString("hex");
-  const oauthReturnUri = resolveOAuthReturnUri(request.nextUrl.origin);
+  const oauthReturnUri = resolveOAuthReturnUri(request);
   const proxyFlow = usesOAuthProxy(
     config.redirectUri,
     oauthReturnUri,

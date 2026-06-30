@@ -116,7 +116,6 @@ export function loadDaikinConfig(): DaikinConfig {
   } catch {
     usesOAuthProxyFlag = process.env.NODE_ENV === "development";
   }
-
   return {
     clientId,
     clientSecret,

@@ -1,4 +1,5 @@
 import { normalizeRedirectUriForOAuth } from "./oauth";
+import { localOAuthReturnUri } from "./request-origin";
 
 export interface OAuthProxyState {
   v: 1;
@@ -44,58 +45,17 @@ export function normalizeOAuthEndpoint(uri: string): string {
   return `${parsed.host}${parsed.pathname}`.toLowerCase();
 }
 
-export function resolveOAuthReturnUri(requestOrigin?: string): string {
-  const explicit = process.env.DAIKIN_OAUTH_RETURN_URI?.trim();
-  if (explicit) {
-    return explicit;
-  }
-
-  const publicUrl = process.env.DAIKIN_PUBLIC_URL?.trim();
-  if (publicUrl) {
-    return `${publicUrl.replace(/\/$/, "")}/api/auth/callback`;
-  }
-
-  if (requestOrigin) {
-    return `${requestOrigin.replace(/\/$/, "")}/api/auth/callback`;
-  }
-
-  if (process.env.NODE_ENV === "development") {
-    const port = process.env.PORT?.trim() || "3000";
-    return `http://localhost:${port}/api/auth/callback`;
-  }
-
-  throw new Error(
-    "Cannot resolve OAuth return URI. Set DAIKIN_OAUTH_RETURN_URI or DAIKIN_PUBLIC_URL.",
-  );
-}
+export { resolveOAuthReturnUri } from "./request-origin";
 
 export function buildAllowedOAuthReturnUris(): string[] {
-  const fromEnv =
-    process.env.DAIKIN_OAUTH_ALLOWED_RETURN_URIS?.split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean) ?? [];
-
-  const defaults = [
-    "http://localhost:3000/api/auth/callback",
-    "http://127.0.0.1:3000/api/auth/callback",
-  ];
+  const uris = [localOAuthReturnUri()];
 
   const publicUrl = process.env.DAIKIN_PUBLIC_URL?.trim();
   if (publicUrl) {
-    defaults.push(`${publicUrl.replace(/\/$/, "")}/api/auth/callback`);
+    uris.push(`${publicUrl.replace(/\/$/, "")}/api/auth/callback`);
   }
 
-  const returnUri = process.env.DAIKIN_OAUTH_RETURN_URI?.trim();
-  if (returnUri) {
-    defaults.push(returnUri);
-  }
-
-  const registeredRedirect = process.env.DAIKIN_REDIRECT_URI?.trim();
-  if (registeredRedirect) {
-    defaults.push(normalizeRedirectUriForOAuth(registeredRedirect));
-  }
-
-  return [...new Set([...defaults, ...fromEnv])];
+  return uris;
 }
 
 export function isAllowedOAuthReturnUri(

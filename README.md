@@ -45,22 +45,16 @@ Daikin Developer Portal allows **one redirect URI** per app. Point it at product
 https://daikin-dashboard-XXXX.europe-west1.run.app/api/auth/callback
 ```
 
-In local `.env` set the same value:
+In local `.env`:
 
 ```env
 DAIKIN_REDIRECT_URI=https://daikin-dashboard-XXXX.europe-west1.run.app/api/auth/callback
-```
-
-After Daikin consent, the production `/api/auth/callback` reads `state` and redirects the
-authorization code back to `http://localhost:3000/api/auth/callback` (or to production when
-you log in there). Token exchange still uses the registered redirect URI above.
-
-Optional overrides:
-
-```env
-DAIKIN_OAUTH_RETURN_URI=http://localhost:3000/api/auth/callback
 DAIKIN_PUBLIC_URL=https://daikin-dashboard-XXXX.europe-west1.run.app
 ```
+
+After Daikin consent, production `/api/auth/callback` reads `state` and redirects the code to
+`http://localhost:3000/api/auth/callback` when you started login locally, or stays on production
+when you used the Cloud Run URL. Token exchange always uses `DAIKIN_REDIRECT_URI`.
 
 ### OAuth without proxy (localhost only)
 
@@ -107,7 +101,7 @@ gcloud run deploy daikin-dashboard \
   --region europe-west1 \
   --allow-unauthenticated \
   --memory 512Mi \
-  --set-env-vars DAIKIN_REDIRECT_URI=https://YOUR_SERVICE_HOSTNAME/api/auth/callback,DAIKIN_TOKEN_BACKEND=firestore,DAIKIN_HOUSEHOLD_ID=Strejdomov,GCP_PROJECT_ID=YOUR_GCP_PROJECT,DAIKIN_TOKEN_FILE=/app/.data/tokens.json \
+  --set-env-vars DAIKIN_REDIRECT_URI=https://YOUR_SERVICE_HOSTNAME/api/auth/callback,DAIKIN_PUBLIC_URL=https://YOUR_SERVICE_HOSTNAME,DAIKIN_TOKEN_BACKEND=firestore,DAIKIN_HOUSEHOLD_ID=Strejdomov,GCP_PROJECT_ID=YOUR_GCP_PROJECT,DAIKIN_TOKEN_FILE=/app/.data/tokens.json \
   --set-secrets DAIKIN_CLIENT_ID=daikin-client-id:latest,DAIKIN_CLIENT_SECRET=daikin-client-secret:latest,DAIKIN_TOKENS_JSON=daikin-tokens-json:latest,DASHBOARD_ACCESS_TOKEN=daikin-dashboard-access-token:latest
 ```
 
