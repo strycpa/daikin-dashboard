@@ -80,11 +80,11 @@ export function AuthConnectPanel({
 
   if (demoMode) {
     return (
-      <section className="rounded-2xl border border-dashed border-slate-600 bg-slate-900/40 p-8 text-center">
-        <h2 className="text-lg font-semibold text-white">Demo režim</h2>
-        <p className="mx-auto mt-2 max-w-lg text-sm text-slate-400">
-          Bez <code className="text-teal-300">DAIKIN_CLIENT_ID</code> běží ukázkových
-          5 jednotek. Doplň credentials v <code className="text-teal-300">.env</code>{" "}
+      <section className="rounded-2xl border border-dashed border-slate-600 bg-slate-900/40 p-8 text-center [html[data-theme='light']_&]:border-slate-300 [html[data-theme='light']_&]:bg-slate-50">
+        <h2 className="text-lg font-semibold text-white [html[data-theme='light']_&]:text-slate-900">Demo režim</h2>
+        <p className="mx-auto mt-2 max-w-lg text-sm text-slate-400 [html[data-theme='light']_&]:text-slate-600">
+          Bez <code className="text-teal-300 [html[data-theme='light']_&]:text-teal-600">DAIKIN_CLIENT_ID</code> běží ukázkových
+          5 jednotek. Doplň credentials v <code className="text-teal-300 [html[data-theme='light']_&]:text-teal-600">.env</code>{" "}
           pro reálné připojení.
         </p>
       </section>
@@ -92,11 +92,11 @@ export function AuthConnectPanel({
   }
 
   return (
-    <section className="rounded-2xl border border-slate-700/70 bg-slate-900/50 p-6 sm:p-8">
-      <h2 className="text-lg font-semibold text-white">Připojení k Daikin cloudu</h2>
-      <p className="mt-2 max-w-2xl text-sm text-slate-400">
+    <section className="rounded-2xl border border-slate-700/70 bg-slate-900/50 p-6 sm:p-8 [html[data-theme='light']_&]:border-slate-200 [html[data-theme='light']_&]:bg-white">
+      <h2 className="text-lg font-semibold text-white [html[data-theme='light']_&]:text-slate-900">Připojení k Daikin cloudu</h2>
+      <p className="mt-2 max-w-2xl text-sm text-slate-400 [html[data-theme='light']_&]:text-slate-600">
         Redirect URI v Daikin portálu:{" "}
-        <code className="text-teal-300">{redirectUri}</code>
+        <code className="text-teal-300 [html[data-theme='light']_&]:text-teal-600">{redirectUri}</code>
       </p>
 
       {usesOAuthProxy && (
