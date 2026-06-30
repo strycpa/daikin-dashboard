@@ -158,6 +158,7 @@ export function parseGatewayDevice(
     siteId: string | null;
     roomLabels: Record<string, string>;
     fallbackIndex: number;
+    customDeviceNames?: Record<string, { customName: string | null; cloudName: string | null }>;
   },
 ): UnitStatus | null {
   const climate = findManagementPoint(device.managementPoints, "climateControl");
@@ -173,7 +174,10 @@ export function parseGatewayDevice(
   const online = device.isCloudConnectionUp?.value ?? true;
 
   const defaultLabel = `Unit ${options.fallbackIndex + 1}`;
+  const customName = options.customDeviceNames?.[device.id]?.customName;
+  
   const label =
+    customName ??
     options.roomLabels[device.id] ??
     device.name ??
     device.deviceModel ??
@@ -203,6 +207,7 @@ export function parseGatewayDevices(
     siteId: string | null;
     roomLabels: Record<string, string>;
     siteDeviceIds?: string[];
+    customDeviceNames?: Record<string, { customName: string | null; cloudName: string | null }>;
   },
 ): UnitStatus[] {
   const filtered =
@@ -216,6 +221,7 @@ export function parseGatewayDevices(
         siteId: options.siteId,
         roomLabels: options.roomLabels,
         fallbackIndex: index,
+        customDeviceNames: options.customDeviceNames,
       }),
     )
     .filter((unit): unit is UnitStatus => unit !== null);

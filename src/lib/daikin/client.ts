@@ -1,6 +1,10 @@
 import { loadDaikinConfig, requireCredentials, getTokenStoreContext } from "./config";
 import { DEFAULT_MODE, getClimatePoint, parseGatewayDevices } from "./parser";
 import { readStoredToken, writeStoredToken } from "./token-store";
+import {
+  readDeviceNames,
+  syncCloudNames,
+} from "./firestore-device-names";
 import type {
   DaikinSite,
   DaikinTokenSet,
@@ -245,10 +249,38 @@ export async function fetchUnits(siteId: string | null): Promise<DevicesResponse
     ? devices.filter((device) => siteDeviceIds?.includes(device.id))
     : devices;
 
+  let customDeviceNames: Record<string, { customName: string | null; cloudName: string | null }> = {};
+  
+  if (config.gcpProjectId && config.tokenBackend === "firestore") {
+    try {
+      const deviceNamesFromFirestore = await readDeviceNames(
+        config.gcpProjectId,
+        config.householdId,
+      );
+      
+      customDeviceNames = Object.fromEntries(
+        Object.entries(deviceNamesFromFirestore).map(([id, record]) => [
+          id,
+          { customName: record.customName, cloudName: record.cloudName },
+        ]),
+      );
+
+      const cloudNames = devices.map((device) => ({
+        id: device.id,
+        cloudName: device.name ?? null,
+      }));
+      
+      await syncCloudNames(config.gcpProjectId, config.householdId, cloudNames);
+    } catch (error) {
+      console.error("Failed to load device names from Firestore:", error);
+    }
+  }
+
   const units = parseGatewayDevices(devices, {
     siteId: effectiveSiteId,
     roomLabels: config.roomLabels,
     siteDeviceIds,
+    customDeviceNames,
   });
 
   const skippedWithoutClimateControl =

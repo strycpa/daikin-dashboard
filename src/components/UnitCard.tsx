@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { OperationMode, UnitStatus } from "@/lib/daikin/types";
 import { formatTemperature, modeLabel, OPERATION_MODES } from "@/lib/utils";
 import { cn } from "@/lib/cn";
@@ -15,6 +16,7 @@ interface UnitCardProps {
     setpointC?: number;
     fanSpeed?: number;
   }) => Promise<void>;
+  onNameChange?: (deviceId: string, newName: string) => Promise<void>;
   busy: boolean;
 }
 
@@ -23,9 +25,35 @@ export function UnitCard({
   selected,
   onSelectChange,
   onControl,
+  onNameChange,
   busy,
 }: UnitCardProps) {
   const isOn = unit.power === "on";
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(unit.label);
+  const [isSavingName, setIsSavingName] = useState(false);
+
+  const handleSaveName = async () => {
+    if (!onNameChange || editedName === unit.label) {
+      setIsEditingName(false);
+      return;
+    }
+
+    setIsSavingName(true);
+    try {
+      await onNameChange(unit.id, editedName);
+      setIsEditingName(false);
+    } catch (error) {
+      console.error("Failed to save name:", error);
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditedName(unit.label);
+    setIsEditingName(false);
+  };
 
   return (
     <article
@@ -49,7 +77,7 @@ export function UnitCard({
       />
 
       <header className="mb-4 flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-xs uppercase tracking-widest text-slate-500">
             {unit.model}
           </p>
@@ -60,13 +88,61 @@ export function UnitCard({
                 aria-hidden
               />
             )}
-            <h2 className={cn("text-lg font-semibold", isOn ? "text-white" : "text-slate-300")}>
-              {unit.label}
-            </h2>
+            {isEditingName ? (
+              <div className="flex flex-1 items-center gap-2">
+                <input
+                  type="text"
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  className="flex-1 rounded border border-teal-400/50 bg-slate-900/70 px-2 py-1 text-sm text-white focus:border-teal-400 focus:outline-none"
+                  disabled={isSavingName}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      void handleSaveName();
+                    } else if (e.key === "Escape") {
+                      handleCancelEdit();
+                    }
+                  }}
+                  autoFocus
+                />
+                <button
+                  onClick={() => void handleSaveName()}
+                  disabled={isSavingName}
+                  className="text-xs text-teal-300 hover:text-teal-200 disabled:opacity-50"
+                  type="button"
+                >
+                  ✓
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  disabled={isSavingName}
+                  className="text-xs text-slate-400 hover:text-slate-300 disabled:opacity-50"
+                  type="button"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <h2 className={cn("truncate text-lg font-semibold", isOn ? "text-white" : "text-slate-300")}>
+                  {unit.label}
+                </h2>
+                {onNameChange && (
+                  <button
+                    onClick={() => setIsEditingName(true)}
+                    className="shrink-0 text-xs text-slate-500 opacity-0 transition-opacity hover:text-teal-400 group-hover:opacity-100"
+                    type="button"
+                    title="Přejmenovat"
+                  >
+                    ✎
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
-        <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-600/50 bg-slate-900/50 px-2.5 py-1.5 text-xs text-slate-300">
+        <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-600/50 bg-slate-900/50 px-2.5 py-1.5 text-xs text-slate-300">
           <input
             type="checkbox"
             checked={selected}
