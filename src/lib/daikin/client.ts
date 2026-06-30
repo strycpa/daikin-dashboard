@@ -22,10 +22,6 @@ import {
   TOKEN_URL,
 } from "./config";
 import { getDemoSites, getDemoUnits, applyDemoControl } from "./demo";
-import { createShortLivedCache } from "./api-cache";
-
-const cachedSites = createShortLivedCache<DaikinSite[]>();
-const cachedGatewayDevices = createShortLivedCache<GatewayDevice[]>();
 
 function resolveOperationMode(
   unit: UnitStatus,
@@ -199,7 +195,8 @@ export async function fetchSites(): Promise<DaikinSite[]> {
     return getDemoSites();
   }
 
-  return cachedSites(() => apiFetch<DaikinSite[]>("/v1/sites"));
+  const sites = await apiFetch<DaikinSite[]>("/v1/sites");
+  return sites;
 }
 
 export async function fetchGatewayDevices(): Promise<GatewayDevice[]> {
@@ -208,9 +205,7 @@ export async function fetchGatewayDevices(): Promise<GatewayDevice[]> {
     return [];
   }
 
-  return cachedGatewayDevices(() =>
-    apiFetch<GatewayDevice[]>("/v1/gateway-devices"),
-  );
+  return apiFetch<GatewayDevice[]>("/v1/gateway-devices");
 }
 
 export async function fetchUnits(siteId: string | null): Promise<DevicesResponse> {
