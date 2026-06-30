@@ -149,7 +149,16 @@ export function Dashboard() {
   }, [auth?.demoMode, refreshData, startDaikinReauth]);
 
   useEffect(() => {
-    void refreshData();
+    let cancelled = false;
+    void (async () => {
+      if (!cancelled) {
+        await refreshData();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshData]);
 
   useEffect(() => {
@@ -157,9 +166,20 @@ export function Dashboard() {
       return;
     }
 
-    void loadUnits(siteId).catch((err: unknown) => {
-      setError(err instanceof Error ? err.message : "Failed to load units");
-    });
+    let cancelled = false;
+    void (async () => {
+      try {
+        await loadUnits(siteId);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Failed to load units");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [auth?.authenticated, loadUnits, siteId]);
 
   useEffect(() => {
@@ -169,18 +189,33 @@ export function Dashboard() {
 
     if (authResult === "success") {
       window.history.replaceState({}, "", "/");
-      void loadAuth().then((status) => {
+
+      let cancelled = false;
+      void (async () => {
+        const status = await loadAuth();
+        if (cancelled) {
+          return;
+        }
+
         const household = status.householdId ?? "Strejdomov";
         setNotice(
           status.tokenBackend === "firestore"
             ? `Připojeno k Daikin cloudu. Token uložen do Firestore pro domácnost „${household}".`
             : "Připojeno k Daikin cloudu.",
         );
-        void refreshData();
-      });
+        await refreshData();
+      })();
+
+      return () => {
+        cancelled = true;
+      };
     }
 
     if (authResult === "error") {
+      // Surface the OAuth error carried in the URL into UI state on mount. This is a
+      // one-shot synchronization of external (redirect) state with no async work to
+      // await, so the synchronous setState here is intentional.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setError(message ?? "OAuth selhalo");
       window.history.replaceState({}, "", "/");
     }
