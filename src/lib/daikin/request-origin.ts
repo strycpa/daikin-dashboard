@@ -13,7 +13,9 @@ function productionOAuthReturnUri(): string {
   return `${publicUrl.replace(/\/$/, "")}/api/auth/callback`;
 }
 
-function isLocalRequest(request?: Pick<NextRequest, "nextUrl">): boolean {
+function isLocalRequest(
+  request?: Pick<NextRequest, "nextUrl">,
+): request is Pick<NextRequest, "nextUrl"> {
   return request?.nextUrl.hostname === "localhost";
 }
 
