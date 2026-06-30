@@ -61,7 +61,7 @@ export function UnitCard({
         "group relative flex flex-col overflow-hidden rounded-2xl border p-5 shadow-card transition-all duration-300",
         isOn
           ? "border-teal-400/45 bg-card-on-gradient shadow-glow-teal-soft"
-          : "border-slate-700/60 bg-card-gradient hover:border-slate-500/60",
+          : "border-slate-700/60 bg-card-gradient hover:border-slate-500/60 [html[data-theme='light']_&]:border-slate-200 [html[data-theme='light']_&]:hover:border-slate-300",
         selected && "border-teal-400/60 shadow-glow-teal ring-1 ring-teal-400/25",
         !unit.online && "opacity-60",
       )}
@@ -78,7 +78,7 @@ export function UnitCard({
 
       <header className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs uppercase tracking-widest text-slate-500">
+          <p className="text-xs uppercase tracking-widest text-slate-500 [html[data-theme='light']_&]:text-slate-600">
             {unit.model}
           </p>
           <div className="flex items-center gap-2">
@@ -94,7 +94,7 @@ export function UnitCard({
                   type="text"
                   value={editedName}
                   onChange={(e) => setEditedName(e.target.value)}
-                  className="flex-1 rounded border border-teal-400/50 bg-slate-900/70 px-2 py-1 text-sm text-white focus:border-teal-400 focus:outline-none"
+                  className="flex-1 rounded border border-teal-400/50 bg-slate-900/70 px-2 py-1 text-sm text-white focus:border-teal-400 focus:outline-none [html[data-theme='light']_&]:bg-white [html[data-theme='light']_&]:text-slate-900"
                   disabled={isSavingName}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
@@ -124,7 +124,7 @@ export function UnitCard({
               </div>
             ) : (
               <div className="flex min-w-0 flex-1 items-center gap-2">
-                <h2 className={cn("truncate text-lg font-semibold", isOn ? "text-white" : "text-slate-300")}>
+                <h2 className={cn("truncate text-lg font-semibold", isOn ? "text-white [html[data-theme='light']_&]:text-slate-900" : "text-slate-300 [html[data-theme='light']_&]:text-slate-700")}>
                   {unit.label}
                 </h2>
                 {onNameChange && (
@@ -142,7 +142,7 @@ export function UnitCard({
           </div>
         </div>
 
-        <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-600/50 bg-slate-900/50 px-2.5 py-1.5 text-xs text-slate-300">
+        <label className="flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-slate-600/50 bg-slate-900/50 px-2.5 py-1.5 text-xs text-slate-300 [html[data-theme='light']_&]:border-slate-300 [html[data-theme='light']_&]:bg-white [html[data-theme='light']_&]:text-slate-700">
           <input
             type="checkbox"
             checked={selected}
@@ -164,9 +164,9 @@ export function UnitCard({
         <Metric label="Režim" value={modeLabel(unit.mode)} />
       </div>
 
-      <div className="mt-auto space-y-4 border-t border-slate-700/60 pt-4">
+      <div className="mt-auto space-y-4 border-t border-slate-700/60 pt-4 [html[data-theme='light']_&]:border-slate-200">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-slate-300">Power</span>
+          <span className="text-sm text-slate-300 [html[data-theme='light']_&]:text-slate-700">Power</span>
           <Toggle
             checked={isOn}
             disabled={busy || !unit.online}
@@ -179,8 +179,8 @@ export function UnitCard({
 
         <div>
           <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="text-slate-300">Teplota</span>
-            <span className="font-mono text-teal-300">
+            <span className="text-slate-300 [html[data-theme='light']_&]:text-slate-700">Teplota</span>
+            <span className="font-mono text-teal-300 [html[data-theme='light']_&]:text-teal-600">
               {unit.setpointC ?? unit.capabilities.setpointMin}°C
             </span>
           </div>
@@ -197,8 +197,8 @@ export function UnitCard({
 
         <div>
           <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="text-slate-300">Ventilátor</span>
-            <span className="font-mono text-teal-300">
+            <span className="text-slate-300 [html[data-theme='light']_&]:text-slate-700">Ventilátor</span>
+            <span className="font-mono text-teal-300 [html[data-theme='light']_&]:text-teal-600">
               {unit.fanSpeed ?? 1}
               {unit.fanMax ? `/${unit.fanMax}` : ""}
             </span>
@@ -214,7 +214,7 @@ export function UnitCard({
         </div>
 
         <div>
-          <p className="mb-2 text-sm text-slate-300">Režim</p>
+          <p className="mb-2 text-sm text-slate-300 [html[data-theme='light']_&]:text-slate-700">Režim</p>
           <Select
             value={unit.mode}
             disabled={busy || !unit.online || !isOn}
@@ -262,15 +262,15 @@ export function UnitCard({
 function Metric({
   label,
   value,
-  accent = "text-white",
+  accent = "text-white [html[data-theme='light']_&]:text-slate-900",
 }: {
   label: string;
   value: string;
   accent?: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-700/50 bg-slate-900/40 px-3 py-2">
-      <p className="text-[10px] uppercase tracking-wider text-slate-500">
+    <div className="rounded-xl border border-slate-700/50 bg-slate-900/40 px-3 py-2 [html[data-theme='light']_&]:border-slate-200 [html[data-theme='light']_&]:bg-slate-50">
+      <p className="text-[10px] uppercase tracking-wider text-slate-500 [html[data-theme='light']_&]:text-slate-600">
         {label}
       </p>
       <p className={cn("font-mono text-sm font-medium", accent)}>{value}</p>

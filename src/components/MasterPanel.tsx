@@ -41,21 +41,21 @@ export function MasterPanel({
   const caps = units[0]?.capabilities;
 
   return (
-    <section className="rounded-2xl border border-teal-500/20 bg-master-gradient p-6 shadow-glow-teal-soft">
+    <section className="rounded-2xl border border-teal-500/20 bg-master-gradient p-6 shadow-glow-teal-soft [html[data-theme='light']_&]:border-teal-300/40">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-teal-400/80">
+          <p className="text-xs uppercase tracking-[0.2em] text-teal-400/80 [html[data-theme='light']_&]:text-teal-600">
             Master control
           </p>
-          <h2 className="text-xl font-semibold text-white">
+          <h2 className="text-xl font-semibold text-white [html[data-theme='light']_&]:text-slate-900">
             Hromadné ovládání
           </h2>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-slate-400 [html[data-theme='light']_&]:text-slate-600">
             {selectedCount} z {units.length} jednotek vybráno
           </p>
         </div>
 
-        <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-900/50 px-3 py-2 text-sm text-slate-200">
+        <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-600/60 bg-slate-900/50 px-3 py-2 text-sm text-slate-200 [html[data-theme='light']_&]:border-slate-300 [html[data-theme='light']_&]:bg-white [html[data-theme='light']_&]:text-slate-800">
           <input
             type="checkbox"
             checked={allSelected}
@@ -68,7 +68,7 @@ export function MasterPanel({
 
       <div className="grid gap-5 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
         <div>
-          <p className="mb-2 text-sm text-slate-300">Cílová teplota</p>
+          <p className="mb-2 text-sm text-slate-300 [html[data-theme='light']_&]:text-slate-700">Cílová teplota</p>
           <Slider
             value={draftSetpoint}
             min={caps?.setpointMin ?? 16}
@@ -81,7 +81,7 @@ export function MasterPanel({
         </div>
 
         <div>
-          <p className="mb-2 text-sm text-slate-300">Ventilátor</p>
+          <p className="mb-2 text-sm text-slate-300 [html[data-theme='light']_&]:text-slate-700">Ventilátor</p>
           <Slider
             value={draftFan}
             min={caps?.fanMin ?? 1}
@@ -93,7 +93,7 @@ export function MasterPanel({
         </div>
 
         <div>
-          <p className="mb-2 text-sm text-slate-300">Režim</p>
+          <p className="mb-2 text-sm text-slate-300 [html[data-theme='light']_&]:text-slate-700">Režim</p>
           <Select
             value={draftMode}
             disabled={busy || selectedCount === 0}
