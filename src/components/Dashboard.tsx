@@ -281,6 +281,32 @@ export function Dashboard() {
     await postControl({ deviceId, ...changes });
   };
 
+  const handleNameChange = async (deviceId: string, newName: string) => {
+    setError(null);
+
+    try {
+      const response = await fetch("/api/device-names", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId, customName: newName }),
+      });
+
+      const data = (await response.json()) as {
+        error?: string;
+        success?: boolean;
+      };
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Failed to save device name");
+      }
+
+      await loadUnits(siteId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save device name");
+      throw err;
+    }
+  };
+
   const handleMasterApply = async (changes: {
     power?: "on" | "off";
     mode?: OperationMode;
@@ -452,6 +478,7 @@ export function Dashboard() {
                   });
                 }}
                 onControl={(changes) => handleUnitControl(unit.id, changes)}
+                onNameChange={(deviceId, newName) => handleNameChange(deviceId, newName)}
               />
             ))}
 
