@@ -10,6 +10,7 @@ import {
 import { AuthConnectPanel } from "@/components/AuthConnectPanel";
 import { MasterPanel } from "@/components/MasterPanel";
 import { UnitCard } from "@/components/UnitCard";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/controls";
 
 interface AuthStatus {
@@ -373,7 +374,7 @@ export function Dashboard() {
               onChange={(event) =>
                 handleSiteChange(event.target.value || null)
               }
-              className="rounded-xl border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-slate-100"
+              className="rounded-xl border border-slate-600 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 [html[data-theme='light']_&]:border-slate-300 [html[data-theme='light']_&]:bg-white [html[data-theme='light']_&]:text-slate-900"
             >
               {sites.map((site) => (
                 <option key={site.id} value={site.id}>
@@ -382,6 +383,8 @@ export function Dashboard() {
               ))}
             </select>
           )}
+
+          <ThemeToggle />
 
           <Button
             variant="secondary"
@@ -516,15 +519,15 @@ export function Dashboard() {
 function StatCard({
   label,
   value,
-  accent = "text-white",
+  accent = "text-white [html[data-theme='light']_&]:text-slate-900",
 }: {
   label: string;
   value: string;
   accent?: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 px-4 py-3">
-      <p className="text-[10px] uppercase tracking-wider text-slate-500">{label}</p>
+    <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 px-4 py-3 [html[data-theme='light']_&]:border-slate-200 [html[data-theme='light']_&]:bg-white">
+      <p className="text-[10px] uppercase tracking-wider text-slate-500 [html[data-theme='light']_&]:text-slate-600">{label}</p>
       <p className={`mt-1 font-mono text-lg font-semibold ${accent}`}>{value}</p>
     </div>
   );
@@ -543,8 +546,8 @@ function Banner({
     <div
       className={
         tone === "error"
-          ? "rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
-          : "rounded-xl border border-teal-500/30 bg-teal-500/10 px-4 py-3 text-sm text-teal-100"
+          ? "rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 [html[data-theme='light']_&]:border-rose-300 [html[data-theme='light']_&]:bg-rose-50 [html[data-theme='light']_&]:text-rose-800"
+          : "rounded-xl border border-teal-500/30 bg-teal-500/10 px-4 py-3 text-sm text-teal-100 [html[data-theme='light']_&]:border-teal-300 [html[data-theme='light']_&]:bg-teal-50 [html[data-theme='light']_&]:text-teal-800"
       }
     >
       <div className="flex items-start justify-between gap-3">
