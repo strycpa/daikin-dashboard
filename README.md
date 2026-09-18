@@ -6,6 +6,7 @@ Next.js dashboard for controlling multiple Daikin Comfora units via the Onecta c
 
 - Live status for all AC units in a household/site
 - Per-unit controls (power, mode, temperature, fan)
+- Large **Vytopit dům** / **STOP** / **Vychladit dům** buttons for full-house heating, shutdown, or cooling
 - Master panel with checkboxes to batch-apply settings
 - Site selector (or hardcode via `DAIKIN_SITE_ID`)
 - Demo mode with 5 sample units when credentials are missing
@@ -64,7 +65,14 @@ manual paste flow in the connect panel. For a single shared Daikin app, prefer t
 
 ## API rate limits
 
-Daikin limits cloud API to ~200 requests/day and 20/minute. Batch controls include a short delay between units.
+Daikin limits the Onecta cloud API to ~200 requests/day and 20/minute. There is **no batch write endpoint** — each characteristic (`onOffMode`, `operationMode`, temperature, fan) is a separate `PATCH`.
+
+House-wide heat/cool/stop and other multi-unit commands therefore:
+
+1. Plan per-unit payloads (max setpoint for heating, min for cooling, max fan, or power off).
+2. Skip offline units and units that do not support the mode.
+3. Skip characteristics that are already at the target value.
+4. Send remaining writes sequentially with a ~3.5s gap so the 20/min budget is not exhausted, and retry `429` using `Retry-After`.
 
 ## Deploy to Google Cloud Run
 
