@@ -129,6 +129,12 @@ export interface BatchControlPayload {
   fanSpeed?: number;
 }
 
+export type HouseClimateAction = Extract<OperationMode, "heating" | "cooling">;
+
+export interface HouseClimatePayload {
+  houseClimate: HouseClimateAction;
+}
+
 export interface DevicesMeta {
   rawGatewayCount: number;
   rawSiteCount: number;
