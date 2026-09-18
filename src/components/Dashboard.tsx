@@ -360,7 +360,9 @@ export function Dashboard() {
     setNotice(
       action === "heating"
         ? "Nastavuji topení naplno na všech online jednotkách. Kvůli limitu Daikin API to může chvíli trvat."
-        : "Nastavuji chlazení naplno na všech online jednotkách. Kvůli limitu Daikin API to může chvíli trvat.",
+        : action === "cooling"
+          ? "Nastavuji chlazení naplno na všech online jednotkách. Kvůli limitu Daikin API to může chvíli trvat."
+          : "Vypínám všechny online jednotky. Kvůli limitu Daikin API to může chvíli trvat.",
     );
 
     try {
@@ -658,14 +660,18 @@ function readControlResponse(value: unknown): ControlResponse {
   };
 }
 
-function czechUnitCount(count: number): string {
+function czechUnitCount(count: number, verb: "nastaven" | "vypnut"): string {
   if (count === 1) {
-    return "1 jednotka nastavena";
+    return verb === "nastaven" ? "1 jednotka nastavena" : "1 jednotka vypnuta";
   }
   if (count >= 2 && count <= 4) {
-    return `${count} jednotky nastaveny`;
+    return verb === "nastaven"
+      ? `${count} jednotky nastaveny`
+      : `${count} jednotky vypnuty`;
   }
-  return `${count} jednotek nastaveno`;
+  return verb === "nastaven"
+    ? `${count} jednotek nastaveno`
+    : `${count} jednotek vypnuto`;
 }
 
 function formatSkipped(items: ControlNamedItem[]): string {
@@ -676,13 +682,23 @@ function formatHouseClimateNotice(
   action: HouseClimateAction,
   result: ControlResponse,
 ): string {
-  const verb = action === "heating" ? "vytápí" : "chladí";
   const parts: string[] = [];
 
-  if (result.succeeded.length > 0) {
-    parts.push(`Dům se ${verb} naplno — ${czechUnitCount(result.succeeded.length)}`);
+  if (action === "off") {
+    if (result.succeeded.length > 0) {
+      parts.push(`Dům je vypnutý — ${czechUnitCount(result.succeeded.length, "vypnut")}`);
+    } else {
+      parts.push("Žádná jednotka se nevypnula");
+    }
+  } else if (result.succeeded.length > 0) {
+    const verb = action === "heating" ? "vytápí" : "chladí";
+    parts.push(
+      `Dům se ${verb} naplno — ${czechUnitCount(result.succeeded.length, "nastaven")}`,
+    );
   } else {
-    parts.push(`Žádná jednotka se nenastavila na ${action === "heating" ? "topení" : "chlazení"}`);
+    parts.push(
+      `Žádná jednotka se nenastavila na ${action === "heating" ? "topení" : "chlazení"}`,
+    );
   }
 
   const skippedOffline = result.skipped.filter((item) => item.reason === "offline");

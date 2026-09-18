@@ -41,9 +41,10 @@ function makeUnit(overrides: Partial<UnitStatus> = {}): UnitStatus {
 }
 
 describe("house climate planning", () => {
-  it("accepts only heating and cooling actions", () => {
+  it("accepts heating, cooling, and off", () => {
     assert.equal(isHouseClimateAction("heating"), true);
     assert.equal(isHouseClimateAction("cooling"), true);
+    assert.equal(isHouseClimateAction("off"), true);
     assert.equal(isHouseClimateAction("auto"), false);
     assert.equal(isHouseClimateAction("fanOnly"), false);
   });
@@ -122,6 +123,24 @@ describe("house climate planning", () => {
       kind: "skip",
       reason: "unsupported-mode",
     });
+  });
+
+  it("stops an online unit with power off only", () => {
+    const plan = planHouseClimateControl(makeUnit({ power: "on" }), "off");
+    assert.equal(plan.kind, "apply");
+    if (plan.kind !== "apply") {
+      return;
+    }
+
+    assert.deepEqual(plan.payload, {
+      deviceId: "demo-unit-1",
+      power: "off",
+    });
+  });
+
+  it("skips offline units for stop as well", () => {
+    const plan = planHouseClimateControl(makeUnit({ online: false }), "off");
+    assert.deepEqual(plan, { kind: "skip", reason: "offline" });
   });
 });
 
