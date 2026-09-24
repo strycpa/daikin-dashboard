@@ -23,6 +23,7 @@ import type {
   DevicesResponse,
   GatewayDevice,
   HouseClimateAction,
+  HouseClimateRestoreUnit,
   OperationMode,
   UnitControlPayload,
   UnitStatus,
@@ -378,14 +379,23 @@ export async function applyUnitControl(
   const mode = resolveOperationMode(unit, payload.mode);
   const modeChanging =
     payload.mode !== undefined && payload.mode !== unit.mode;
+  const turningOff = payload.power === "off";
 
-  if (payload.power !== undefined && payload.power !== unit.power) {
-    await patchCharacteristic(
-      unit.id,
-      embeddedId,
-      "onOffMode",
-      payload.power,
-    );
+  const applyPower = async (): Promise<void> => {
+    if (payload.power !== undefined && payload.power !== unit.power) {
+      await patchCharacteristic(
+        unit.id,
+        embeddedId,
+        "onOffMode",
+        payload.power,
+      );
+    }
+  };
+
+  // When stopping, restore mode/setpoint/fan while the unit is still on,
+  // so the next power-on comes back in the original climate settings.
+  if (!turningOff) {
+    await applyPower();
   }
 
   if (modeChanging && payload.mode !== undefined) {
@@ -432,6 +442,10 @@ export async function applyUnitControl(
       `${fanPrefix}/modes/fixed`,
     );
   }
+
+  if (turningOff) {
+    await applyPower();
+  }
 }
 
 export async function applyBatchControl(
@@ -460,13 +474,18 @@ export async function applyBatchControl(
 export async function applyHouseClimate(
   units: UnitStatus[],
   action: HouseClimateAction,
+  restore: HouseClimateRestoreUnit[] = [],
 ): Promise<HouseClimateResult> {
   const succeeded: HouseClimateResult["succeeded"] = [];
   const failed: HouseClimateResult["failed"] = [];
   const skipped: HouseClimateResult["skipped"] = [];
+  const restoreById = new Map<string, HouseClimateRestoreUnit>();
+  for (const item of restore) {
+    restoreById.set(item.deviceId, item);
+  }
 
   for (const unit of units) {
-    const plan = planHouseClimateControl(unit, action);
+    const plan = planHouseClimateControl(unit, action, restoreById.get(unit.id));
     if (plan.kind === "skip") {
       skipped.push({
         id: unit.id,

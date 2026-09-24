@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DaikinSite, DevicesMeta, HouseClimateAction, OperationMode, UnitStatus } from "@/lib/daikin/types";
 import {
+  clearHouseClimateSnapshot,
+  readHouseClimateSnapshot,
+  rememberHouseClimateSnapshot,
+} from "@/lib/daikin/house-climate-snapshot";
+import {
   averageRoomTemp,
   countPoweredOn,
   formatTemperature,
@@ -357,17 +362,31 @@ export function Dashboard() {
     }
 
     setHouseAction(action);
+    const restore =
+      action === "off" ? readHouseClimateSnapshot() : [];
     setNotice(
       action === "heating"
         ? "Nastavuji topení naplno na všech online jednotkách. Kvůli limitu Daikin API to může chvíli trvat."
         : action === "cooling"
           ? "Nastavuji chlazení naplno na všech online jednotkách. Kvůli limitu Daikin API to může chvíli trvat."
-          : "Vypínám všechny online jednotky. Kvůli limitu Daikin API to může chvíli trvat.",
+          : restore.length > 0
+            ? "Vracím původní nastavení a vypínám jednotky. Kvůli limitu Daikin API to může chvíli trvat."
+            : "Vypínám všechny online jednotky. Kvůli limitu Daikin API to může chvíli trvat.",
     );
 
+    if (action === "heating" || action === "cooling") {
+      rememberHouseClimateSnapshot(units);
+    }
+
     try {
-      const result = await postControl({ houseClimate: action });
-      setNotice(formatHouseClimateNotice(action, result));
+      const result = await postControl({
+        houseClimate: action,
+        ...(restore.length > 0 ? { restore } : {}),
+      });
+      setNotice(formatHouseClimateNotice(action, result, restore.length > 0));
+      if (action === "off" && result.failed.length === 0) {
+        clearHouseClimateSnapshot();
+      }
     } catch {
       setNotice(null);
     } finally {
@@ -681,12 +700,17 @@ function formatSkipped(items: ControlNamedItem[]): string {
 function formatHouseClimateNotice(
   action: HouseClimateAction,
   result: ControlResponse,
+  restored = false,
 ): string {
   const parts: string[] = [];
 
   if (action === "off") {
     if (result.succeeded.length > 0) {
-      parts.push(`Dům je vypnutý — ${czechUnitCount(result.succeeded.length, "vypnut")}`);
+      parts.push(
+        restored
+          ? `Dům je vypnutý, původní nastavení vráceno — ${czechUnitCount(result.succeeded.length, "vypnut")}`
+          : `Dům je vypnutý — ${czechUnitCount(result.succeeded.length, "vypnut")}`,
+      );
     } else {
       parts.push("Žádná jednotka se nevypnula");
     }

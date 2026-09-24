@@ -2,11 +2,18 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { UnitStatus } from "./types";
 import {
+  captureHouseClimateRestore,
   isHouseClimateAction,
   planHouseClimateControl,
+  readHouseClimateRestore,
   targetFanSpeed,
   targetSetpointC,
 } from "./house-climate";
+import {
+  clearHouseClimateSnapshot,
+  rememberHouseClimateSnapshot,
+  readHouseClimateSnapshot,
+} from "./house-climate-snapshot";
 import {
   createDaikinWritePacer,
   parseRetryAfterMs,
@@ -138,9 +145,86 @@ describe("house climate planning", () => {
     });
   });
 
+  it("stops an online unit and restores prior climate settings", () => {
+    const plan = planHouseClimateControl(makeUnit({ power: "on", mode: "heating", setpointC: 30, fanSpeed: 5 }), "off", {
+      deviceId: "demo-unit-1",
+      mode: "cooling",
+      setpointC: 22,
+      fanSpeed: 3,
+    });
+    assert.equal(plan.kind, "apply");
+    if (plan.kind !== "apply") {
+      return;
+    }
+
+    assert.deepEqual(plan.payload, {
+      deviceId: "demo-unit-1",
+      power: "off",
+      mode: "cooling",
+      setpointC: 22,
+      fanSpeed: 3,
+    });
+  });
+
   it("skips offline units for stop as well", () => {
     const plan = planHouseClimateControl(makeUnit({ online: false }), "off");
     assert.deepEqual(plan, { kind: "skip", reason: "offline" });
+  });
+
+  it("captures restore payloads from current unit state", () => {
+    const restore = captureHouseClimateRestore([
+      makeUnit({ id: "a", mode: "heating", setpointC: 23, fanSpeed: 2 }),
+      makeUnit({ id: "b", mode: "cooling", setpointC: null, fanSpeed: null }),
+    ]);
+    assert.deepEqual(restore, [
+      { deviceId: "a", mode: "heating", setpointC: 23, fanSpeed: 2 },
+      { deviceId: "b", mode: "cooling" },
+    ]);
+  });
+
+  it("parses restore arrays and ignores invalid entries", () => {
+    assert.deepEqual(
+      readHouseClimateRestore([
+        { deviceId: "a", mode: "heating", setpointC: 21, fanSpeed: 4 },
+        { deviceId: "b", mode: "turbo" },
+        { nope: true },
+      ]),
+      [
+        { deviceId: "a", mode: "heating", setpointC: 21, fanSpeed: 4 },
+        { deviceId: "b" },
+      ],
+    );
+  });
+});
+
+describe("house climate snapshot storage", () => {
+  function memoryStorage(initial: Record<string, string> = {}) {
+    const data = { ...initial };
+    return {
+      getItem: (key: string) => data[key] ?? null,
+      setItem: (key: string, value: string) => {
+        data[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete data[key];
+      },
+    };
+  }
+
+  it("remembers the first snapshot and ignores later overwrites", () => {
+    const storage = memoryStorage();
+    const first = [makeUnit({ mode: "cooling", setpointC: 22, fanSpeed: 3 })];
+    const later = [makeUnit({ mode: "heating", setpointC: 30, fanSpeed: 5 })];
+
+    rememberHouseClimateSnapshot(first, storage);
+    rememberHouseClimateSnapshot(later, storage);
+
+    assert.deepEqual(readHouseClimateSnapshot(storage), [
+      { deviceId: "demo-unit-1", mode: "cooling", setpointC: 22, fanSpeed: 3 },
+    ]);
+
+    clearHouseClimateSnapshot(storage);
+    assert.deepEqual(readHouseClimateSnapshot(storage), []);
   });
 });
 

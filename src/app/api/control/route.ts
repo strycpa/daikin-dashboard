@@ -5,7 +5,10 @@ import {
   applyUnitControl,
   fetchUnits,
 } from "@/lib/daikin/client";
-import { isHouseClimateAction } from "@/lib/daikin/house-climate";
+import {
+  isHouseClimateAction,
+  readHouseClimateRestore,
+} from "@/lib/daikin/house-climate";
 import { validateControlPayload } from "@/lib/daikin/parser";
 import type {
   OperationMode,
@@ -66,7 +69,11 @@ export async function POST(request: NextRequest) {
     const { units } = await fetchUnits(siteId);
 
     if (isHouseClimateAction(body.houseClimate)) {
-      const result = await applyHouseClimate(units, body.houseClimate);
+      const result = await applyHouseClimate(
+        units,
+        body.houseClimate,
+        readHouseClimateRestore(body.restore),
+      );
       return NextResponse.json(result);
     }
 

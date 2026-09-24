@@ -6,7 +6,7 @@ Next.js dashboard for controlling multiple Daikin Comfora units via the Onecta c
 
 - Live status for all AC units in a household/site
 - Per-unit controls (power, mode, temperature, fan)
-- Large **Vytopit dům** / **STOP** / **Vychladit dům** buttons for full-house heating, shutdown, or cooling
+- Large **Vytopit dům** / **STOP** / **Vychladit dům** buttons for full-house heating, shutdown, or cooling. Heat/cool remember prior unit settings in `sessionStorage`; STOP restores them and powers every online unit off.
 - Master panel with checkboxes to batch-apply settings
 - Site selector (or hardcode via `DAIKIN_SITE_ID`)
 - Demo mode with 5 sample units when credentials are missing

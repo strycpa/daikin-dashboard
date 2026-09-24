@@ -1,10 +1,12 @@
 import type {
   HouseClimateAction,
+  HouseClimateRestoreUnit,
+  OperationMode,
   UnitControlPayload,
   UnitStatus,
 } from "./types";
 
-export type { HouseClimateAction };
+export type { HouseClimateAction, HouseClimateRestoreUnit };
 
 export type HouseClimateMode = Extract<HouseClimateAction, "heating" | "cooling">;
 
@@ -40,6 +42,16 @@ export function isHouseClimateAction(
   return value === "heating" || value === "cooling" || value === "off";
 }
 
+export function isOperationModeValue(value: unknown): value is OperationMode {
+  return (
+    value === "auto" ||
+    value === "cooling" ||
+    value === "heating" ||
+    value === "fanOnly" ||
+    value === "dry"
+  );
+}
+
 export function targetSetpointC(
   unit: UnitStatus,
   action: HouseClimateMode,
@@ -54,9 +66,82 @@ export function targetFanSpeed(unit: UnitStatus): number {
   return unit.capabilities.fanMax;
 }
 
+export function captureHouseClimateRestore(
+  units: UnitStatus[],
+): HouseClimateRestoreUnit[] {
+  return units.map((unit) => {
+    const restore: HouseClimateRestoreUnit = { deviceId: unit.id };
+    if (isOperationModeValue(unit.mode)) {
+      restore.mode = unit.mode;
+    }
+    if (typeof unit.setpointC === "number") {
+      restore.setpointC = unit.setpointC;
+    }
+    if (typeof unit.fanSpeed === "number") {
+      restore.fanSpeed = unit.fanSpeed;
+    }
+    return restore;
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+export function readHouseClimateRestore(
+  value: unknown,
+): HouseClimateRestoreUnit[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const items: HouseClimateRestoreUnit[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry) || typeof entry.deviceId !== "string") {
+      continue;
+    }
+
+    const restore: HouseClimateRestoreUnit = { deviceId: entry.deviceId };
+    if (isOperationModeValue(entry.mode)) {
+      restore.mode = entry.mode;
+    }
+    if (typeof entry.setpointC === "number") {
+      restore.setpointC = entry.setpointC;
+    }
+    if (typeof entry.fanSpeed === "number") {
+      restore.fanSpeed = entry.fanSpeed;
+    }
+    items.push(restore);
+  }
+
+  return items;
+}
+
+function restoreForUnit(
+  unit: UnitStatus,
+  restore: HouseClimateRestoreUnit | undefined,
+): Pick<UnitControlPayload, "mode" | "setpointC" | "fanSpeed"> {
+  if (!restore) {
+    return {};
+  }
+
+  const payload: Pick<UnitControlPayload, "mode" | "setpointC" | "fanSpeed"> = {};
+  if (restore.mode !== undefined && unit.capabilities.modes.includes(restore.mode)) {
+    payload.mode = restore.mode;
+  }
+  if (typeof restore.setpointC === "number") {
+    payload.setpointC = restore.setpointC;
+  }
+  if (typeof restore.fanSpeed === "number") {
+    payload.fanSpeed = restore.fanSpeed;
+  }
+  return payload;
+}
+
 export function planHouseClimateControl(
   unit: UnitStatus,
   action: HouseClimateAction,
+  restore?: HouseClimateRestoreUnit,
 ): HouseClimatePlan {
   if (!unit.online) {
     return { kind: "skip", reason: "offline" };
@@ -68,6 +153,7 @@ export function planHouseClimateControl(
       payload: {
         deviceId: unit.id,
         power: "off",
+        ...restoreForUnit(unit, restore),
       },
     };
   }

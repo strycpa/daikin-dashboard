@@ -131,8 +131,16 @@ export interface BatchControlPayload {
 
 export type HouseClimateAction = "heating" | "cooling" | "off";
 
+export interface HouseClimateRestoreUnit {
+  deviceId: string;
+  mode?: OperationMode;
+  setpointC?: number;
+  fanSpeed?: number;
+}
+
 export interface HouseClimatePayload {
   houseClimate: HouseClimateAction;
+  restore?: HouseClimateRestoreUnit[];
 }
 
 export interface DevicesMeta {

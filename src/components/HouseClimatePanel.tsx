@@ -32,7 +32,7 @@ const BUTTONS: {
     eyebrow: "Vypnout",
     idleTitle: "STOP",
     busyTitle: "Vypínám dům…",
-    subtitle: "Vypne všechny online jednotky",
+    subtitle: "Vrátí původní nastavení a vypne jednotky",
     className:
       "border-rose-500/50 bg-gradient-to-br from-slate-800 to-slate-950 text-white shadow-[0_0_28px_rgb(244_63_94_/_0.22)] hover:from-slate-700 hover:to-slate-900 [html[data-theme='light']_&]:from-slate-800 [html[data-theme='light']_&]:to-slate-900 [html[data-theme='light']_&]:shadow-[0_0_20px_rgb(244_63_94_/_0.18)]",
   },
@@ -65,9 +65,9 @@ export function HouseClimatePanel({
           Vytopit / STOP / vychladit
         </h2>
         <p className="mt-1 text-sm text-slate-400 [html[data-theme='light']_&]:text-slate-600">
-          Zapne všechny online jednotky na maximum topení nebo chlazení, nebo je
-          vypne. Daikin API nemá hromadný zápis, proto se povely posílají
-          postupně s ohledem na limit 20 požadavků za minutu.
+          Vytopit a vychladit si v tomto prohlížeči zapamatují stav jednotek.
+          STOP je vrátí do toho stavu a všechny vypne, aby se příště zapnuly
+          s původním nastavením.
         </p>
       </div>
 
