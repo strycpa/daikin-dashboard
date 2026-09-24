@@ -1,13 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DaikinSite, DevicesMeta, OperationMode, UnitStatus } from "@/lib/daikin/types";
+import type { DaikinSite, DevicesMeta, HouseClimateAction, OperationMode, UnitStatus } from "@/lib/daikin/types";
+import {
+  clearHouseClimateSnapshot,
+  readHouseClimateSnapshot,
+  rememberHouseClimateSnapshot,
+} from "@/lib/daikin/house-climate-snapshot";
 import {
   averageRoomTemp,
   countPoweredOn,
   formatTemperature,
 } from "@/lib/utils";
 import { AuthConnectPanel } from "@/components/AuthConnectPanel";
+import { HouseClimatePanel } from "@/components/HouseClimatePanel";
 import { MasterPanel } from "@/components/MasterPanel";
 import { UnitCard } from "@/components/UnitCard";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -33,6 +39,7 @@ export function Dashboard() {
   const [auth, setAuth] = useState<AuthStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [houseAction, setHouseAction] = useState<HouseClimateAction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -251,7 +258,7 @@ export function Dashboard() {
 
   const postControl = async (
     payload: Record<string, unknown>,
-  ): Promise<void> => {
+  ): Promise<ControlResponse> => {
     setBusy(true);
     setError(null);
 
@@ -262,24 +269,26 @@ export function Dashboard() {
         body: JSON.stringify({ siteId, ...payload }),
       });
 
-      const data = (await response.json()) as {
-        error?: string;
-        failed?: { id: string; error: string }[];
-      };
+      const data: unknown = await response.json();
+      const result = readControlResponse(data);
 
       if (!response.ok) {
-        throw new Error(data.error ?? "Control failed");
+        throw new Error(result.error ?? "Control failed");
       }
 
-      if (data.failed && data.failed.length > 0) {
+      if (result.failed.length > 0) {
         setError(
-          `Některé jednotky selhaly: ${data.failed.map((item) => item.error).join(", ")}`,
+          `Některé jednotky selhaly: ${result.failed
+            .map((item) => item.label ?? item.id)
+            .join(", ")}`,
         );
       }
 
       await loadUnits(siteId);
+      return result;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Control failed");
+      throw err;
     } finally {
       setBusy(false);
     }
@@ -294,7 +303,11 @@ export function Dashboard() {
       fanSpeed?: number;
     },
   ) => {
-    await postControl({ deviceId, ...changes });
+    try {
+      await postControl({ deviceId, ...changes });
+    } catch {
+      // Error is already shown in the banner.
+    }
   };
 
   const handleNameChange = async (deviceId: string, newName: string) => {
@@ -333,10 +346,52 @@ export function Dashboard() {
       return;
     }
 
-    await postControl({
-      deviceIds: [...selectedIds],
-      ...changes,
-    });
+    try {
+      await postControl({
+        deviceIds: [...selectedIds],
+        ...changes,
+      });
+    } catch {
+      // Error is already shown in the banner.
+    }
+  };
+
+  const handleHouseClimate = async (action: HouseClimateAction) => {
+    if (units.length === 0) {
+      return;
+    }
+
+    setHouseAction(action);
+    const restore =
+      action === "off" ? readHouseClimateSnapshot() : [];
+    setNotice(
+      action === "heating"
+        ? "Nastavuji topení naplno na všech online jednotkách. Kvůli limitu Daikin API to může chvíli trvat."
+        : action === "cooling"
+          ? "Nastavuji chlazení naplno na všech online jednotkách. Kvůli limitu Daikin API to může chvíli trvat."
+          : restore.length > 0
+            ? "Vracím původní nastavení a vypínám jednotky. Kvůli limitu Daikin API to může chvíli trvat."
+            : "Vypínám všechny online jednotky. Kvůli limitu Daikin API to může chvíli trvat.",
+    );
+
+    if (action === "heating" || action === "cooling") {
+      rememberHouseClimateSnapshot(units);
+    }
+
+    try {
+      const result = await postControl({
+        houseClimate: action,
+        ...(restore.length > 0 ? { restore } : {}),
+      });
+      setNotice(formatHouseClimateNotice(action, result, restore.length > 0));
+      if (action === "off" && result.failed.length === 0) {
+        clearHouseClimateSnapshot();
+      }
+    } catch {
+      setNotice(null);
+    } finally {
+      setHouseAction(null);
+    }
   };
 
   const stats = useMemo(
@@ -461,6 +516,13 @@ export function Dashboard() {
             </section>
           )}
 
+          <HouseClimatePanel
+            unitCount={units.length}
+            busy={busy}
+            activeAction={houseAction}
+            onApply={handleHouseClimate}
+          />
+
           <MasterPanel
             units={units}
             selectedIds={selectedIds}
@@ -562,4 +624,118 @@ function Banner({
       </div>
     </div>
   );
+}
+
+interface ControlNamedItem {
+  id: string;
+  label?: string;
+  error?: string;
+  reason?: string;
+}
+
+interface ControlResponse {
+  error?: string;
+  failed: ControlNamedItem[];
+  skipped: ControlNamedItem[];
+  succeeded: ControlNamedItem[];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function readNamedItems(value: unknown): ControlNamedItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const items: ControlNamedItem[] = [];
+  for (const entry of value) {
+    if (!isRecord(entry) || typeof entry.id !== "string") {
+      continue;
+    }
+
+    items.push({
+      id: entry.id,
+      label: typeof entry.label === "string" ? entry.label : undefined,
+      error: typeof entry.error === "string" ? entry.error : undefined,
+      reason: typeof entry.reason === "string" ? entry.reason : undefined,
+    });
+  }
+
+  return items;
+}
+
+function readControlResponse(value: unknown): ControlResponse {
+  if (!isRecord(value)) {
+    return { failed: [], skipped: [], succeeded: [] };
+  }
+
+  return {
+    error: typeof value.error === "string" ? value.error : undefined,
+    failed: readNamedItems(value.failed),
+    skipped: readNamedItems(value.skipped),
+    succeeded: readNamedItems(value.succeeded),
+  };
+}
+
+function czechUnitCount(count: number, verb: "nastaven" | "vypnut"): string {
+  if (count === 1) {
+    return verb === "nastaven" ? "1 jednotka nastavena" : "1 jednotka vypnuta";
+  }
+  if (count >= 2 && count <= 4) {
+    return verb === "nastaven"
+      ? `${count} jednotky nastaveny`
+      : `${count} jednotky vypnuty`;
+  }
+  return verb === "nastaven"
+    ? `${count} jednotek nastaveno`
+    : `${count} jednotek vypnuto`;
+}
+
+function formatSkipped(items: ControlNamedItem[]): string {
+  return items.map((item) => item.label ?? item.id).join(", ");
+}
+
+function formatHouseClimateNotice(
+  action: HouseClimateAction,
+  result: ControlResponse,
+  restored = false,
+): string {
+  const parts: string[] = [];
+
+  if (action === "off") {
+    if (result.succeeded.length > 0) {
+      parts.push(
+        restored
+          ? `Dům je vypnutý, původní nastavení vráceno — ${czechUnitCount(result.succeeded.length, "vypnut")}`
+          : `Dům je vypnutý — ${czechUnitCount(result.succeeded.length, "vypnut")}`,
+      );
+    } else {
+      parts.push("Žádná jednotka se nevypnula");
+    }
+  } else if (result.succeeded.length > 0) {
+    const verb = action === "heating" ? "vytápí" : "chladí";
+    parts.push(
+      `Dům se ${verb} naplno — ${czechUnitCount(result.succeeded.length, "nastaven")}`,
+    );
+  } else {
+    parts.push(
+      `Žádná jednotka se nenastavila na ${action === "heating" ? "topení" : "chlazení"}`,
+    );
+  }
+
+  const skippedOffline = result.skipped.filter((item) => item.reason === "offline");
+  const skippedMode = result.skipped.filter(
+    (item) => item.reason === "unsupported-mode",
+  );
+
+  if (skippedOffline.length > 0) {
+    parts.push(`offline přeskočeno: ${formatSkipped(skippedOffline)}`);
+  }
+  if (skippedMode.length > 0) {
+    parts.push(`bez podpory režimu: ${formatSkipped(skippedMode)}`);
+  }
+
+  return `${parts.join(". ")}.`;
 }

@@ -1,16 +1,29 @@
 import { loadDaikinConfig, requireCredentials, getTokenStoreContext } from "./config";
-import { DEFAULT_MODE, getClimatePoint, parseGatewayDevices } from "./parser";
+import { DEFAULT_MODE, getClimatePoint, parseGatewayDevices, validateControlPayload } from "./parser";
 import { readStoredToken, writeStoredToken } from "./token-store";
 import {
   readDeviceNames,
   syncCloudNames,
 } from "./firestore-device-names";
+import {
+  DAIKIN_RATE_LIMIT_DEFAULT_RETRY_MS,
+  DAIKIN_RATE_LIMIT_MAX_RETRIES,
+  parseRetryAfterMs,
+  sleep,
+  waitForDaikinWriteSlot,
+} from "./rate-limit";
+import {
+  planHouseClimateControl,
+  type HouseClimateResult,
+} from "./house-climate";
 import type {
   DaikinSite,
   DaikinTokenSet,
   DevicesMeta,
   DevicesResponse,
   GatewayDevice,
+  HouseClimateAction,
+  HouseClimateRestoreUnit,
   OperationMode,
   UnitControlPayload,
   UnitStatus,
@@ -53,12 +66,22 @@ async function postForm(
   return response.json() as Promise<DaikinTokenSet>;
 }
 
+function isWriteMethod(method: string | undefined): boolean {
+  return method === "PATCH" || method === "POST" || method === "PUT" || method === "DELETE";
+}
+
 async function apiFetch<T>(
   path: string,
   init?: RequestInit,
+  attempt = 0,
 ): Promise<T> {
   const config = loadDaikinConfig();
   requireCredentials(config);
+
+  const method = init?.method ?? "GET";
+  if (isWriteMethod(method) && attempt === 0) {
+    await waitForDaikinWriteSlot();
+  }
 
   const token = await getAccessToken();
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -72,7 +95,15 @@ async function apiFetch<T>(
   });
 
   if (response.status === 429) {
-    throw new Error("Daikin API rate limit reached. Try again later.");
+    if (attempt >= DAIKIN_RATE_LIMIT_MAX_RETRIES) {
+      throw new Error("Daikin API rate limit reached. Try again later.");
+    }
+
+    const retryAfterMs =
+      parseRetryAfterMs(response.headers.get("Retry-After")) ??
+      DAIKIN_RATE_LIMIT_DEFAULT_RETRY_MS;
+    await sleep(retryAfterMs);
+    return apiFetch<T>(path, init, attempt + 1);
   }
 
   if (!response.ok) {
@@ -81,6 +112,7 @@ async function apiFetch<T>(
   }
 
   if (response.status === 204) {
+    // Write endpoints return an empty body; callers do not use the parsed value.
     return undefined as T;
   }
 
@@ -345,17 +377,28 @@ export async function applyUnitControl(
 
   const { embeddedId } = unit;
   const mode = resolveOperationMode(unit, payload.mode);
+  const modeChanging =
+    payload.mode !== undefined && payload.mode !== unit.mode;
+  const turningOff = payload.power === "off";
 
-  if (payload.power !== undefined) {
-    await patchCharacteristic(
-      unit.id,
-      embeddedId,
-      "onOffMode",
-      payload.power,
-    );
+  const applyPower = async (): Promise<void> => {
+    if (payload.power !== undefined && payload.power !== unit.power) {
+      await patchCharacteristic(
+        unit.id,
+        embeddedId,
+        "onOffMode",
+        payload.power,
+      );
+    }
+  };
+
+  // When stopping, restore mode/setpoint/fan while the unit is still on,
+  // so the next power-on comes back in the original climate settings.
+  if (!turningOff) {
+    await applyPower();
   }
 
-  if (payload.mode !== undefined) {
+  if (modeChanging && payload.mode !== undefined) {
     await patchCharacteristic(
       unit.id,
       embeddedId,
@@ -364,7 +407,10 @@ export async function applyUnitControl(
     );
   }
 
-  if (payload.setpointC !== undefined) {
+  if (
+    payload.setpointC !== undefined &&
+    (modeChanging || payload.setpointC !== unit.setpointC)
+  ) {
     await patchCharacteristic(
       unit.id,
       embeddedId,
@@ -374,15 +420,20 @@ export async function applyUnitControl(
     );
   }
 
-  if (payload.fanSpeed !== undefined) {
+  if (
+    payload.fanSpeed !== undefined &&
+    (modeChanging || payload.fanSpeed !== unit.fanSpeed)
+  ) {
     const fanPrefix = `/operationModes/${mode}/fanSpeed`;
-    await patchCharacteristic(
-      unit.id,
-      embeddedId,
-      "fanControl",
-      "fixed",
-      `${fanPrefix}/currentMode`,
-    );
+    if (modeChanging || unit.fanSpeed === null) {
+      await patchCharacteristic(
+        unit.id,
+        embeddedId,
+        "fanControl",
+        "fixed",
+        `${fanPrefix}/currentMode`,
+      );
+    }
     await patchCharacteristic(
       unit.id,
       embeddedId,
@@ -390,6 +441,10 @@ export async function applyUnitControl(
       payload.fanSpeed,
       `${fanPrefix}/modes/fixed`,
     );
+  }
+
+  if (turningOff) {
+    await applyPower();
   }
 }
 
@@ -405,10 +460,6 @@ export async function applyBatchControl(
     try {
       await applyUnitControl(units, { deviceId, ...changes });
       succeeded.push(deviceId);
-      // Respect API rate limits (~20/min)
-      if (!loadDaikinConfig().demoMode) {
-        await sleep(400);
-      }
     } catch (error) {
       failed.push({
         id: deviceId,
@@ -420,8 +471,44 @@ export async function applyBatchControl(
   return { succeeded, failed };
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export async function applyHouseClimate(
+  units: UnitStatus[],
+  action: HouseClimateAction,
+  restore: HouseClimateRestoreUnit[] = [],
+): Promise<HouseClimateResult> {
+  const succeeded: HouseClimateResult["succeeded"] = [];
+  const failed: HouseClimateResult["failed"] = [];
+  const skipped: HouseClimateResult["skipped"] = [];
+  const restoreById = new Map<string, HouseClimateRestoreUnit>();
+  for (const item of restore) {
+    restoreById.set(item.deviceId, item);
+  }
+
+  for (const unit of units) {
+    const plan = planHouseClimateControl(unit, action, restoreById.get(unit.id));
+    if (plan.kind === "skip") {
+      skipped.push({
+        id: unit.id,
+        label: unit.label,
+        reason: plan.reason,
+      });
+      continue;
+    }
+
+    try {
+      const validated = validateControlPayload(unit, plan.payload);
+      await applyUnitControl(units, validated);
+      succeeded.push({ id: unit.id, label: unit.label });
+    } catch (error) {
+      failed.push({
+        id: unit.id,
+        label: unit.label,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  return { action, succeeded, failed, skipped };
 }
 
 export async function getRawDevice(deviceId: string): Promise<GatewayDevice | null> {
